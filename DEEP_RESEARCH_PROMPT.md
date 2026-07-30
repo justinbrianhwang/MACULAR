@@ -78,11 +78,42 @@ Negative results — **this is the problem we need help with**:
   Both are being fixed; assume neither is the interesting question.
 - GRL sign, warm-up, and gradient arrival are unit-tested, so the null effect is not an
   implementation bug.
+- **We have since replaced both the mechanism and the metric, and the result is a stable
+  negative.** Mechanism: LEACE-style closed-form linear concept erasure on the pooled
+  region features, alongside a structural hard mask and the original gate. Metric:
+  discrete attacks — fresh linear probe, fresh nonlinear probe, and an inversion attack
+  scored by exact-match/CER — run both on the mechanism's output and on the
+  post-relation-graph representation that is actually handed downstream. Seed-to-seed std
+  is now 0.002–0.023, smaller than every difference measured. Findings, 3 seeds:
+  (i) the **trivial hard mask wins on every privacy axis** and post-graph drives both
+  probes to the majority baseline (0.849/0.843 vs majority 0.847, inversion exact-match
+  0.002) at a clinical-F1 cost of 0.947 vs 0.976 unprotected;
+  (ii) the differentiable gate is **strictly dominated** — lower utility (0.917) and more
+  leakage on every measure;
+  (iii) **LEACE's guarantee does not transfer**: residual cross-covariance 1.5e-07 on the
+  fitting split but **0.771 on validation**, because our train/val splits use *disjoint
+  PII generator families* by design (disjoint name/address/org/phone/ID pools). Probing
+  the erased validation features directly gives linear 0.932 / nonlinear 0.958 against raw
+  0.964 / 0.974.
 
 Caveats we already know: tiny training budget (24 documents, 12 epochs), one backbone.
 Do not just tell us to add seeds; assume we will.
 
 ### 3. Your questions to answer
+
+**Q0 — Does concept erasure transfer to an unseen attribute-value distribution?**
+This is now our sharpest question and it did not exist when this prompt was first written.
+LEACE and its relatives guarantee zero cross-covariance *on the distribution the eraser was
+fit on*. We measure the guarantee holding perfectly there (1.5e-07) and failing entirely on
+a validation split whose PII values come from a **disjoint generator family** (0.771).
+Find: (a) any paper that evaluates concept erasure under distribution shift in the erased
+attribute's *values* (not just a new task or domain); (b) whether the theory says anything
+about out-of-distribution guarding; (c) any proposed fix — fitting on pooled families,
+regularising the eraser, re-fitting at inference, or a subspace chosen to be
+family-invariant; (d) whether evaluation protocols in the erasure literature routinely
+train and test on the same attribute distribution, which would mean published results
+systematically overstate the guarantee. If (d) is true and nobody has said so in print,
+say so explicitly — that is a finding.
 
 **Q1 — Is our negative result already known, and what replaced the failed method?**
 Adversarial / GRL-based removal of an attribute from a representation. We suspect this is
@@ -213,8 +244,10 @@ Do not invent citations. If a number is not in the source, do not report it.
 - 위 `## THE PROMPT` ~ `## END OF PROMPT` 사이만 복사해서 붙이면 됩니다.
 - 여러 AI에 돌릴 때 **§2의 수치를 절대 지우지 마세요.** 이미 측정한 걸 다시 하라고
   답하는 걸 막아 주는 유일한 장치입니다.
-- 답변 받으면 Q1(concept erasure)과 Q2(공격 강도·안정성) 두 개를 먼저 봐 주세요.
-  나머지는 논문 포장 문제고, 이 둘은 **구현이 바뀌는** 문제입니다.
-- Q2가 특히 급해진 이유: 동일 설정 재실행에서 누출 수치의 **부호가 뒤집혔습니다.**
-  측정기가 신호보다 잡음이 크면 seed를 늘려도 결론이 안 나옵니다. 그래서 Q2를
-  "더 센 공격"만이 아니라 "**안정적인** 공격"까지 묻도록 (a)/(b)로 쪼갰습니다.
+- **2차 라운드부터는 Q0이 최우선입니다.** 1차 라운드 이후 우리가 LEACE를 직접 구현해
+  측정한 결과, **보장이 fit 분포를 벗어나면 무너집니다**(잔차 공분산 1.5e-07 → 0.771).
+  우리 train/val이 PII 생성기 family를 분리해 놓았기 때문인데, 이건 곧 실제 배포 조건
+  입니다. 이 현상을 다룬 선행연구가 없다면 그 자체가 우리 기여가 됩니다.
+- Q1(concept erasure 계보)과 Q2(공격 강도·안정성)는 1차에서 이미 답을 받았습니다.
+  Q2의 안정성 문제는 이산 지표로 해결됐습니다(std 0.002~0.023).
+- 나머지(Q3~Q8)는 논문 포장 문제라 우선순위가 낮습니다.

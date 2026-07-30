@@ -162,10 +162,89 @@ more sophisticated level — the guarantee restated as if it were evidence.
 fresh nonlinear MLP probe, and an inversion attack scored by exact-match and CER.
 Discrete metrics throughout, 3 seeds.
 
+Each attack is run twice: on `z_safe` (the mechanism's own output) and on
+`z_ctx_safe` (after the relation graph — the representation actually handed
+downstream). LEACE's linear guarantee provably survives the linear projector
+(`Cov(W r(x), z) = W Cov(r(x), z) = 0`) but **not** the graph's nonlinearity, so
+the post-graph numbers are the deployed risk. Both are reported.
+
 Decision rule fixed in advance:
 - `hard_mask` is the **floor**. A mechanism that does not beat it is not worth its
   complexity, regardless of how good its theory is.
 - A drop in linear-probe accuracy **without** a drop in MLP-probe accuracy is not
   a privacy result.
+- The LEACE residual covariance is checked on **val**, not just on the fitting
+  split. A guarantee that holds only where it was fit is not a guarantee.
 
-Results: see §5 (appended when the run completes).
+### 4.1 Results (frozen PaddleOCR-VL, counterfactual data, 3 seeds, n_pii = 863)
+
+Attacks on `z_safe` (the mechanism's own output):
+
+| Mechanism | clinical F1 | linear probe | **nonlinear probe** | inversion EM | inversion CER |
+|---|---:|---:|---:|---:|---:|
+| none (unprotected) | 0.976 | 0.967 | 0.982 | 0.094 | 0.389 |
+| **hard_mask** | 0.947 | 0.853 | 0.966 | **0.014** | **0.510** |
+| gate | 0.917 | 0.850 | 0.976 | 0.025 | 0.490 |
+| leace | 0.942 | 0.916 | 0.942 | 0.085 | 0.456 |
+
+Same attacks after the relation graph — **the representation actually handed
+downstream**:
+
+| Mechanism | ctx linear | ctx nonlinear | ctx EM | ctx CER |
+|---|---:|---:|---:|---:|
+| none | 0.958 | 0.975 | 0.046 | 0.454 |
+| **hard_mask** | **0.849** | **0.843** | **0.002** | **1.080** |
+| gate | 0.919 | 0.937 | 0.007 | 0.705 |
+| leace | 0.871 | 0.917 | 0.049 | 0.549 |
+
+Majority baseline 0.847. Seed-to-seed std: 0.002–0.023 — **smaller than every
+difference in the tables.** The discrete metrics fixed the reproducibility
+problem that made §2.2 unusable.
+
+### 4.2 What this says
+
+**1. The trivial hard mask wins on every privacy axis.** Post-graph it puts both
+probes *at* the majority baseline (0.849 / 0.843 vs 0.847) and the inverter
+recovers essentially nothing (EM 0.002, CER > 1.0 — the attacker emits more
+garbage than the target contains). Its utility cost is modest: 0.947 vs 0.976
+unprotected.
+
+**2. The differentiable gate is strictly dominated.** Lower utility than hard
+masking (0.917 vs 0.947) *and* more leakage on every measure. There is no
+operating point at which it is the right choice. Proposal gate #4 fails, and
+this time the measurement is stable enough to say so.
+
+**3. LEACE's guarantee does not transfer.** Residual cross-covariance is
+1.5e-07 on the fitting split and **0.771 on validation**. Probing the erased
+validation features directly — before the projector, before any training —
+gives linear 0.932 / nonlinear 0.958 against a raw 0.964 / 0.974 and a majority
+of 0.847. The erasure barely moves the needle on data it was not fit on.
+
+The reason is a property of our protocol, not an accident: **train and val use
+disjoint PII generator families by design** (family A vs B, with disjoint name,
+address, organisation, phone-prefix and ID pools). The concept subspace carrying
+family A's PII is not the one carrying family B's. This is exactly the
+deployment condition — new patients, unseen name distributions — so a guarantee
+fit on the training distribution is vacuous where it matters. `scripts/
+leace_transfer_control.py` fits an eraser on validation itself to confirm the
+implementation is sound and the failure is transfer, not a bug.
+
+**4. Measuring only the mechanism's output would have been wrong.** Pre-graph,
+hard masking looks partial (nonlinear probe 0.966). Post-graph it is complete
+(0.843). The relation graph does not restore what was structurally removed —
+but it does leave the gate's and LEACE's soft residue readable. Any privacy
+number reported on `z_safe` alone describes a representation nobody deploys.
+
+### 4.3 Consequence for the paper
+
+Neither learned redaction (gate + GRL adversary) nor closed-form linear erasure
+(LEACE) beats structural hard masking on document VLM region features. That is
+now a *systematic* negative result covering both families the literature offers,
+with a stable measurement protocol — considerably stronger than "our gate did
+not work."
+
+The transferable contribution is the evaluation protocol: discrete attacks
+(probe accuracy + inversion exact-match/CER), attacked both at the mechanism and
+after contextualisation, under **held-out PII value families**. That protocol is
+what exposes the LEACE transfer failure, and it is what the four literature
+reviews say the field currently lacks for document/VLM region features.

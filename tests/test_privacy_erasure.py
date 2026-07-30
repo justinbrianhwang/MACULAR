@@ -116,6 +116,33 @@ def test_model_redaction_modes_run():
         assert out["pii_logits"].shape == (b, n, cfg.n_pii_classes)
 
 
+def test_linear_guardedness_survives_a_linear_projector():
+    """Why erasing BEFORE the projector is sound.
+
+    LEACE zeroes Cov(r(x), z). Any linear map W keeps it zero, since
+    Cov(W r(x), z) = W Cov(r(x), z) = 0. So the guarantee still holds at the
+    projector output. It does NOT survive a nonlinearity — which is why the
+    relation-graph output is attacked separately (ctx_* in erasure_comparison).
+    """
+    x, z = _linear_concept(n=800, d=24)
+    xe = fit_leace(x, z)(x)
+    proj = torch.nn.Linear(24, 64)
+    with torch.no_grad():
+        projected = proj(xe)
+    assert linear_probe(projected, z)["accuracy_above_majority"] < 0.05
+
+
+def test_relation_graph_output_is_exposed_for_attack():
+    """The deployed representation must be attackable, not just the gate output."""
+    from macular.models import MacularConfig, MacularModel
+
+    torch.manual_seed(0)
+    model = MacularModel(MacularConfig(d_in=16))
+    out = model(torch.randn(2, 6, 16), torch.rand(2, 6, 4))
+    assert "z_ctx_safe" in out
+    assert out["z_ctx_safe"].shape == out["z_safe"].shape
+
+
 def test_leace_path_is_differentiable():
     """The erasure must not silently cut gradients to the backbone."""
     from macular.models import MacularConfig, MacularModel
