@@ -179,3 +179,45 @@ def test_funsd_format_converter():
     assert blocks["FORM TITLE"] == "title"
     assert blocks["Name"] == "label"
     assert blocks["John Doe"] == "value"
+
+
+def test_every_family_is_complete_and_disjoint():
+    """Adding a PII family means adding it to EVERY pool.
+
+    Families D and E were added so a concept eraser could be fitted across
+    several PII value distributions (the family-A-only fit does not transfer to
+    family B). A family missing from one pool dict raises KeyError only at
+    document-generation time, deep inside a run, so check it here instead.
+    """
+    import itertools
+
+    import numpy as np
+
+    from macular.data.pii_generators import (
+        Family, all_families, _GIVEN, _SURNAME, _ORG, _STREET,
+        _PHONE_PREFIX, _ID_CENTURY,
+    )
+
+    fams = all_families()
+    assert set(fams) >= {"A", "B", "C", "D", "E"}
+
+    rng = np.random.RandomState(0)
+    for name in fams:
+        fam = Family(name)
+        for lang in ("ko", "en", "ja"):
+            # Every accessor must work for every (family, language) pair.
+            for fn in (fam.full_name, fam.address, fam.organization,
+                       fam.phone, fam.national_id, fam.patient_id, fam.email):
+                assert fn(rng, lang)
+
+    for pool in (_GIVEN, _SURNAME, _ORG):
+        for lang in ("ko", "en", "ja"):
+            sets = {f: set(pool[(f, lang)]) for f in fams}
+            for a, b in itertools.combinations(fams, 2):
+                assert not sets[a] & sets[b], (lang, a, b, sets[a] & sets[b])
+
+    for a, b in itertools.combinations(fams, 2):
+        assert not set(_STREET[a]) & set(_STREET[b])
+    # Numeric PII must not collide either.
+    assert len({_PHONE_PREFIX[f] for f in fams}) == len(fams)
+    assert len({_ID_CENTURY[f] for f in fams}) == len(fams)

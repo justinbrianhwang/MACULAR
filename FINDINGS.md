@@ -229,6 +229,29 @@ fit on the training distribution is vacuous where it matters. `scripts/
 leace_transfer_control.py` fits an eraser on validation itself to confirm the
 implementation is sound and the failure is transfer, not a bug.
 
+**3a. The transfer failure is real, not an implementation bug** (`results/
+leace_transfer_control.json`). Fitting the eraser on validation and probing
+validation drives the linear probe to **exactly** the majority baseline —
+0.847 vs 0.847, residual covariance 1.3e-07. The implementation does what the
+theorem says. Side by side on the same validation regions:
+
+| Eraser | linear probe | nonlinear probe |
+|---|---:|---:|
+| none (raw) | 0.964 | 0.974 |
+| fit on family A, applied to B | 0.932 | 0.958 |
+| fit on family B, applied to B | **0.847** (= majority) | 0.912 |
+
+Two limits, both quantified: LEACE is **exactly right in-distribution and only
+there** (+0.085 linear leakage once the PII values change), and even in the best
+case a **nonlinear attacker keeps +0.065 over chance** — the caveat the erasure
+literature states, now measured on document VLM region features.
+
+**3b. Cheap remedies do not rescue it** (`results/leace_fix_sweep.json`).
+Coarsening the concept to binary is-PII (0.956), heavier covariance shrinkage
+(0.928 at eps=0.1), and truncating the concept subspace to its top 1/2/4
+directions (0.956/0.956/0.952) are all no better than the 0.932 baseline, and
+most are worse. The failure is not a hyperparameter.
+
 **4. Measuring only the mechanism's output would have been wrong.** Pre-graph,
 hard masking looks partial (nonlinear probe 0.966). Post-graph it is complete
 (0.843). The relation graph does not restore what was structurally removed —
