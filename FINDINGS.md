@@ -201,14 +201,24 @@ Majority baseline 0.847. Seed-to-seed std: 0.002–0.023 — **smaller than ever
 difference in the tables.** The discrete metrics fixed the reproducibility
 problem that made §2.2 unusable.
 
-### 4.1b Second backbone — Qwen2-VL-2B (same data, same protocol)
+### 4.1b All three backbones (same data, same protocol, 3 seeds each)
 
-| Mechanism | clinical F1 | linear | nonlinear | EM | CER | ctx linear | ctx nonlinear | ctx EM | ctx CER |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| none | 0.899 | 0.971 | 0.977 | 0.007 | 0.522 | 0.956 | 0.968 | 0.004 | 0.549 |
-| hard_mask | 0.778 | 0.848 | 0.956 | 0.002 | 0.575 | 0.848 | 0.859 | 0.001 | **0.949** |
-| gate | 0.826 | 0.848 | 0.967 | 0.005 | 0.558 | 0.923 | 0.929 | 0.002 | 0.743 |
-| **leace** | **0.890** | **0.847** | **0.907** | 0.010 | 0.719 | 0.846 | 0.860 | 0.003 | 0.844 |
+Post-relation-graph numbers — the deployed surface. Majority baseline 0.847.
+
+| Backbone | Mechanism | clinical F1 | ctx linear | ctx nonlinear | ctx CER |
+|---|---|---:|---:|---:|---:|
+| PaddleOCR-VL 0.9B | none | 0.976 | 0.958 | 0.975 | 0.454 |
+| | hard_mask | 0.947 | 0.849 | **0.843** | **1.080** |
+| | gate | 0.917 | 0.919 | 0.937 | 0.705 |
+| | leace | 0.942 | 0.871 | 0.917 | 0.549 |
+| Qwen2-VL-2B | none | 0.899 | 0.956 | 0.968 | 0.549 |
+| | hard_mask | 0.778 | 0.848 | **0.859** | **0.949** |
+| | gate | 0.826 | 0.923 | 0.929 | 0.743 |
+| | leace | **0.890** | 0.846 | 0.860 | 0.844 |
+| Ministral-3 | none | 0.944 | 0.953 | 0.975 | 0.493 |
+| | hard_mask | 0.731 | 0.876 | **0.879** | **0.915** |
+| | gate | 0.779 | 0.946 | 0.959 | 0.581 |
+| | leace | **0.897** | 0.877 | 0.896 | 0.623 |
 
 ### 4.2 What this says
 
@@ -219,37 +229,44 @@ every measure. On Qwen2-VL-2B it is beaten by LEACE on both axes at once (utilit
 backbone and no operating point at which the gate is the right choice. Proposal
 gate #4 fails, and the measurement is now stable enough to say so.
 
-**2. Whether closed-form erasure beats structural masking depends on the
-backbone — and the deciding factor is measurable.** This is a correction: on
-PaddleOCR-VL alone the conclusion looked like "the trivial hard mask wins on
-every privacy axis", and that does not survive the second backbone.
+**2. Structural masking is never worse on privacy; erasure can be far cheaper in
+utility — by a backbone-dependent amount.** Across all three backbones,
+hard masking's post-graph nonlinear leakage is ≤ LEACE's (0.843 vs 0.917;
+0.859 vs 0.860; 0.879 vs 0.896) and its inversion CER is the highest (1.080 /
+0.949 / 0.915). But its utility cost swings enormously by backbone, and LEACE's
+does not:
 
-| | PaddleOCR-VL (0.9B, document-specialised) | Qwen2-VL-2B (general) |
-|---|---|---|
-| LEACE residual cov on val | 0.771 | **0.480** |
-| LEACE linear probe (cross-family) | 0.916 | **0.847 = majority** |
-| Winner on privacy/utility | **hard mask** (0.947 F1, ctx nonlinear 0.843) | **LEACE** (0.890 F1 vs 0.778, ctx nonlinear 0.860 vs 0.859) |
+| Backbone | hard_mask F1 | leace F1 | utility gap |
+|---|---:|---:|---:|
+| PaddleOCR-VL | 0.947 | 0.942 | −0.005 |
+| Qwen2-VL-2B | 0.778 | 0.890 | **+0.112** |
+| Ministral-3 | 0.731 | 0.897 | **+0.166** |
 
-On Qwen2-VL-2B, LEACE reaches the *same* post-graph leakage as hard masking
-(0.860 vs 0.859) while keeping **+0.112 clinical F1**. On PaddleOCR-VL it does
-not, because the erasure transfers far worse there. The mechanism ranking tracks
-**how family-invariantly the backbone encodes PII in its linear structure** — a
-property of the feature extractor, not of the redaction method.
+So the honest statement is a trade-off, not a winner. Structural masking is
+strictly safer against reconstruction; closed-form erasure buys back large
+amounts of clinical utility on two of three backbones for a small increase in
+probe leakage (+0.001 to +0.074) and a much larger loss in value protection.
 
-Hard masking keeps one advantage on both backbones: it protects the literal
-*value* best (post-graph inversion CER 1.080 / 0.949, vs LEACE 0.549 / 0.844).
-So the honest statement is a trade-off, not a winner: structural masking is
-strictly safer against reconstruction, closed-form erasure can be much cheaper in
-utility *when it transfers*.
+**2a. A predictor I proposed does not survive.** After two backbones it looked
+like the ranking tracked erasure transfer quality, measured by the residual
+cross-covariance on validation (0.771 for PaddleOCR-VL where hard masking won,
+0.480 for Qwen where LEACE won). Ministral-3 breaks it: the *lowest* residual
+covariance of the three (0.463) with the *worst* cross-family linear probe
+(0.944 vs 0.932 and 0.889).
 
-**3. LEACE's guarantee transfers poorly, by an amount that varies with the
-backbone.** On PaddleOCR-VL the residual cross-covariance is 1.5e-07 on the
-fitting split and **0.771 on validation**; probing the erased validation features
-directly — before the projector, before any training — gives linear 0.932 /
-nonlinear 0.958 against a raw 0.964 / 0.974 and a majority of 0.847. On
-Qwen2-VL-2B the same quantities are 1.2e-07 / **0.480** and linear 0.889 /
-nonlinear 0.934. Neither transfers cleanly, but the gap between them is what
-decides the mechanism ranking in §4.2.
+The reason is a measurement error worth recording: **the residual covariance is a
+Frobenius norm on unnormalised features, so it is not comparable across
+backbones** — only within one. The probe accuracy is the comparable quantity.
+Reported as a cross-backbone predictor it would have been wrong, and two data
+points were not enough to notice.
+
+**3. LEACE's guarantee does not transfer on any backbone.** Fitted on family A
+and applied to family B, the linear probe on the erased validation features —
+before the projector, before any training — stays far above the 0.847 majority
+baseline on all three: **0.932** (PaddleOCR-VL), **0.889** (Qwen2-VL-2B),
+**0.944** (Ministral-3), against raw values of 0.964 / 0.975 / 0.967. The
+residual cross-covariance is ~1e-07 where the eraser is fitted and 0.46–0.77 on
+validation. The theorem holds exactly where it is fitted (§3a) and nowhere else.
 
 The reason is a property of our protocol, not an accident: **train and val use
 disjoint PII generator families by design** (family A vs B, with disjoint name,
@@ -309,28 +326,34 @@ number reported on `z_safe` alone describes a representation nobody deploys.
 
 ### 4.3 Consequence for the paper
 
-Three claims are supported across two backbones with stable measurements:
+Four claims hold on **all three** backbones, with seed-to-seed std well below
+every difference:
 
 1. **Learned differentiable redaction (gate + GRL adversary) is dominated
-   everywhere.** Not "did not help in our setup" — dominated on both axes, on
-   both backbones, by at least one simpler alternative.
-2. **No mechanism defeats a nonlinear attacker at the mechanism's own output.**
-   Best case 0.907 (LEACE/Qwen) against a majority baseline of 0.847. Contextual
-   mixing then pushes hard masking and LEACE close to chance (0.843–0.860), while
-   leaving the gate readable (0.929–0.937).
-3. **The mechanism ranking is a property of the backbone, and the predictor is
-   erasure transfer.** Where the concept subspace is family-invariant enough for
-   LEACE to transfer (Qwen: residual 0.480), erasure buys the same privacy for
-   +0.112 clinical F1. Where it is not (PaddleOCR-VL: 0.771), structural masking
-   wins. This is a *falsifiable, measurable* selection rule, not a preference.
+   everywhere.** Not "did not help in our setup" — on every backbone some simpler
+   mechanism beats it on both axes at once. On Ministral-3 the gate is the worst
+   protected mechanism measured (ctx nonlinear 0.959 against an unprotected
+   0.975) while also costing utility.
+2. **Closed-form linear erasure does not transfer to unseen PII values on any
+   backbone** (cross-family linear probe 0.889–0.944 against a 0.847 majority),
+   and neither cheaper concepts, shrinkage, rank truncation, nor fitting across
+   three value families repairs it.
+3. **No mechanism defeats a nonlinear attacker at the mechanism's own output.**
+   Contextual mixing then pushes hard masking and LEACE near chance while leaving
+   the gate readable.
+4. **Structural masking is never worse on privacy, and its utility cost is what
+   varies** — from −0.005 to +0.166 clinical F1 against LEACE depending on the
+   backbone. Choosing between them is a per-backbone empirical question, and we
+   could not find a cross-backbone quantity that predicts it (§4.2a).
 
-The transferable contribution is the evaluation protocol that produced all three:
-discrete attacks (probe accuracy + inversion exact-match/CER), applied both at
-the mechanism and after contextualisation, under **held-out PII value families**.
-Without held-out families the LEACE transfer failure is invisible; without the
-post-graph surface, hard masking looks partial when it is complete; without
-discrete metrics the whole comparison is noise (§2.2). All four literature
-reviews report this protocol does not exist for document/VLM region features.
+The transferable contribution is the evaluation protocol that produced all of
+this: discrete attacks (probe accuracy + inversion exact-match/CER), applied both
+at the mechanism and after contextualisation, under **held-out PII value
+families**. Without held-out families the erasure transfer failure is invisible;
+without the post-graph surface, hard masking looks partial when it is complete;
+without discrete metrics the whole comparison is noise (§2.2). All four
+literature reviews report this protocol does not exist for document/VLM region
+features.
 
-**Caveats to carry:** two backbones, one dataset, one document domain, 120
-documents per split, and a synthetic corpus. §5 tracks the third backbone.
+**Caveats to carry:** three backbones, one dataset, one document domain, 120
+documents per split, a synthetic corpus, and frozen features throughout.
