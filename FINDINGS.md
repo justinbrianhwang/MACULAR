@@ -252,6 +252,24 @@ Coarsening the concept to binary is-PII (0.956), heavier covariance shrinkage
 directions (0.956/0.956/0.952) are all no better than the 0.932 baseline, and
 most are worse. The failure is not a hyperparameter.
 
+**3c. Nor does fitting across several PII families** (`results/
+leace_multifamily.json`). Two additional train-side value families (D, E, pools
+disjoint from val and test) were generated so the eraser could be fitted on
+several value distributions at once:
+
+| Eraser fitted on | regions | linear probe | residual cov on val |
+|---|---:|---:|---:|
+| A | 5,738 | 0.932 | 0.771 |
+| A + D | 11,458 | 0.927 | 0.700 |
+| A + D + E | 17,176 | 0.925 | 0.663 |
+| *(control: fitted on val itself)* | — | *0.847 = majority* | *1.3e-07* |
+
+Tripling the fitting data and the family count closes 0.007 of the 0.085 gap.
+The trend is in the right direction and far too shallow to matter: reaching the
+in-distribution floor this way would take an implausible number of families. So
+the transfer failure is **intrinsic**, not a data-budget problem — which makes
+this a complete negative result rather than an open question.
+
 **4. Measuring only the mechanism's output would have been wrong.** Pre-graph,
 hard masking looks partial (nonlinear probe 0.966). Post-graph it is complete
 (0.843). The relation graph does not restore what was structurally removed —

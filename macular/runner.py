@@ -622,9 +622,15 @@ def run_experiment(name: str, cfg: dict) -> dict:
     raise ValueError(f"unknown experiment '{name}'. Try: {RUNNABLE + SCAFFOLDED}")
 
 
-def _write_result(out_dir: str, name: str, result: dict) -> str:
+def _write_result(out_dir: str, name: str, result: dict, suffix: str = "") -> str:
+    """Write results/<name><suffix>.json.
+
+    ``suffix`` exists because the same experiment run against a different
+    backbone or config otherwise silently overwrites the previous run's results —
+    which nearly cost a completed hour-long comparison.
+    """
     os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, f"{name}.json")
+    path = os.path.join(out_dir, f"{name}{suffix}.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
     return path
@@ -678,7 +684,8 @@ def main(argv=None) -> int:
         except NotImplementedError as e:
             print(f"[scaffolded] {e}")
             return 2
-        path = _write_result(args.out, args.experiment, result)
+        path = _write_result(args.out, args.experiment, result,
+                             suffix=cfg.get("result_suffix", ""))
         print(json.dumps(result, ensure_ascii=False, indent=2))
         print(f"\n-> wrote {path}")
         return 0
