@@ -1,0 +1,8 @@
+backbones:
+- llama
+data_dir: data/meddoc_cf_engines
+device: cuda
+dtype: bfloat16
+lr: 0.003
+train_epochs: 80
+train_max_docs: 80

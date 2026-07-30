@@ -1,0 +1,24 @@
+# Conda environment for the MACULAR co-author package.
+#   conda env create -f environment.yml
+#   conda activate macular
+#   pip install -e .
+#
+# The CPU experiments (data gen, shortcut audit, metrics) need only this file.
+# For the OCR baseline, also install the tesseract binary (see README).
+# For the GPU model core, add torch/transformers per the README (pip install -e ".[model]").
+name: macular
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy>=1.24
+  - pillow>=10.0
+  - scikit-learn>=1.3
+  - pyyaml>=6.0
+  - pytest>=7.4
+  - pip
+  # Optional OCR baseline — conda-forge ships the tesseract binary too:
+  # - tesseract
+  # - pytesseract
+  - pip:
+      - -e .

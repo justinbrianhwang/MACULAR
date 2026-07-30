@@ -1,0 +1,19 @@
+# Strong CJK OCR via PaddleOCR (PP-OCR). Runs on the co-author GPU machine.
+#
+# Setup (co-author machine):
+#   pip install -e ".[paddleocr]"
+#   # plus PaddlePaddle for your CUDA — see https://www.paddlepaddle.org.cn/install
+#   #   e.g. python -m pip install paddlepaddle-gpu
+#
+# Then compare PP-OCR against tesseract/easyocr on the SAME set (synthetic or
+# real FUNSD/XFUND) by pointing data_dir at it and rerunning ocr_baseline.
+#
+#   ocr_engine: paddleocr      # PP-OCR (recommended strong CJK)
+#   ocr_engine: paddleocr_vl   # PaddleOCR-VL-1.6 (experimental, heavy; proposal target)
+
+data_dir: data/meddoc
+n_per_split: 500
+languages: [en, ko, ja]
+doc_types: [laboratory_report, prescription]
+render_images: true
+ocr_engine: paddleocr

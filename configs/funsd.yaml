@@ -1,0 +1,9 @@
+# Real public scanned English forms (FUNSD). No PHI.
+#   macular run fetch_funsd   --config configs/funsd.yaml   # download + convert
+#   macular run ocr_baseline  --config configs/funsd.yaml   # OCR on real scans
+#   macular run data_stats    --config configs/funsd.yaml
+# Compare engines by changing ocr_engine (tesseract vs easyocr).
+
+data_dir: data/funsd
+funsd_raw: data/funsd_raw
+ocr_engine: easyocr

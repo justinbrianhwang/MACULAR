@@ -1,0 +1,48 @@
+# MACULAR ablation with a TRAINABLE (LoRA) vision tower — proposal 11.13 Stage 1.
+#
+# Why this config exists, separately from configs/ablation.yaml:
+#   With a FROZEN backbone the redaction gate can only reweight fixed features,
+#   never reshape them, so it has no way to strip content. Measured on frozen
+#   features the gate showed no privacy benefit at all (safe leak +0.0103 vs
+#   unprotected raw +0.0091). With LoRA the same gate cuts identity leakage
+#   sharply (safe +0.0080 vs raw +0.0304), because the representation itself can
+#   now change.
+#
+# Cost: the LoRA path runs one vision forward per document per step (no feature
+# caching), so keep train_max_docs/epochs small.
+#
+# IMPORTANT — eval_max_docs must stay large. The held-out attacker has to fit a
+# regression; with only ~180 PII regions it scores WORSE than the type-mean
+# baseline and the leakage number becomes meaningless (measured -0.041). At 120
+# documents (~863 PII regions) it is a real attack.
+
+data_dir: data/meddoc_cf_engines
+backbone: paddleocr_vl        # 0.9B: smallest strong document VLM we have
+lora: true
+lora_r: 8
+lora_alpha: 16
+
+train_epochs: 12
+train_max_docs: 24            # training budget (expensive: forward per doc/step)
+eval_max_docs: 120            # leakage evaluation set (forward-only, must be big)
+lr: 0.003                     # MACULAR head
+lora_lr: 0.0001               # vision tower adapters
+
+variants: [full, no_gate, no_adversary]
+
+# MANDATORY. Two single-seed runs of this exact config disagreed in SIGN on the
+# leakage reduction (`full`: +0.0224, then -0.0163) because bf16 GPU kernels are
+# non-deterministic and 12 epochs amplify the divergence. The seed-to-seed spread
+# is as large as the effect, so read only `summary` (mean +/- std), never a row.
+seeds: [0, 1, 2]
+
+# STATUS OF THIS EXPERIMENT: it currently answers nothing, and you should not
+# quote it. The 3-seed sweep gave std > mean in every row (full -0.0020 +/-
+# 0.0066, no_gate -0.0458 +/- 0.0457, no_adversary -0.0261 +/- 0.0617) and 2 of
+# 9 runs collapsed (PII AP 0.15, clinical macro-F1 0.0, while other seeds of the
+# same config reached 0.99). Gradient clipping has since been added to
+# fit_with_lora, which should remove the collapses, but the metric was the deeper
+# problem: a continuous cosine similarity cannot resolve an effect this small.
+# The privacy question moved to `erasure_comparison` (discrete attacks, frozen
+# features, closed-form erasure). Re-run this only to check that clipping fixed
+# the collapses -- not to draw a privacy conclusion.

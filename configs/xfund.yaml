@@ -1,0 +1,9 @@
+# Real public scanned multilingual forms (XFUND: Japanese, Spanish). No PHI.
+#   macular run fetch_xfund   --config configs/xfund.yaml   # download + convert
+#   macular run ocr_baseline  --config configs/xfund.yaml   # OCR on real scans
+# This is the fair way to see CJK OCR on GENUINE scanned images (not my renders).
+
+data_dir: data/xfund
+xfund_raw: data/xfund_raw
+xfund_langs: [ja, es]
+ocr_engine: easyocr

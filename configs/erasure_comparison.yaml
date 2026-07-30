@@ -1,0 +1,41 @@
+# Closed-form concept erasure vs the differentiable gate vs the hard-mask floor.
+#
+# WHY THIS REPLACES configs/ablation.yaml AS THE PRIVACY EXPERIMENT
+#
+# The gate ablation answered "does the differentiable gate beat a hard mask?"
+# with: no, on frozen features (it cost clinical macro-F1 0.779 vs 0.933 and
+# bought no measurable privacy), and unmeasurably, under LoRA (a 3-seed sweep
+# gave leak-reduction std larger than the mean, with 2 of 9 runs collapsing).
+#
+# Two things had to change before the question could be asked again:
+#
+#   MECHANISM   LEACE (Belrose et al., NeurIPS 2023) erases the PII concept from
+#               the pooled region features in closed form, with a proof that no
+#               LINEAR classifier can recover it. That is a guarantee; the gate
+#               only ever had a hope.
+#
+#   MEASUREMENT The old metric was a cosine similarity to the true content. It
+#               is continuous, so it drifted with training noise — identical
+#               configs disagreed in sign. Replaced by discrete attacks:
+#               fresh linear probe, fresh NONLINEAR probe, and an inversion
+#               attack scored by exact-match / CER.
+#
+# READING THE RESULT. `hard_mask` is the floor, not a baseline to ignore: a
+# mechanism that does not beat it is not worth its complexity. And a drop in
+# probe_linear_acc WITHOUT a drop in probe_mlp_acc is not a privacy result —
+# LEACE guards linear readouts by construction, so that pattern just restates
+# the theorem while the concept sits in nonlinear structure.
+
+data_dir: data/meddoc_cf_engines
+backbones: [paddleocr_vl]
+device: cuda
+dtype: bfloat16
+
+# Frozen backbone: features are encoded once and reused by every mechanism and
+# seed, so the comparison isolates the mechanism. Cheap and stable, unlike the
+# LoRA path (see configs/lora_ablation.yaml).
+train_epochs: 80
+lr: 0.003
+max_docs: 120
+
+seeds: [0, 1, 2]

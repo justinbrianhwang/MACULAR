@@ -1,0 +1,18 @@
+counterfactual_layout: true
+data_dir: data/meddoc_cf_engines
+doc_types:
+- laboratory_report
+- prescription
+engines:
+- gt
+- easyocr
+languages:
+- en
+- ko
+- ja
+lr: 0.003
+n_per_split: 150
+ocr_engine: easyocr
+render_images: true
+train_epochs: 80
+train_max_docs: 120

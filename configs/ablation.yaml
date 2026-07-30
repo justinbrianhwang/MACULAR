@@ -1,0 +1,9 @@
+# MACULAR component ablation on real VLM features (proposal 17.1).
+# Counterfactual layout so the model cannot answer from geometry.
+data_dir: data/meddoc_cf_engines
+backbones: [ministral]      # strongest backbone from the gate (dAP +0.377)
+device: cuda
+dtype: bfloat16
+train_epochs: 80
+lr: 0.003
+train_max_docs: 120

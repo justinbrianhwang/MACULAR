@@ -1,2 +1,23 @@
-# Proposal 
+# Proposal
 Proposal/
+
+# deep-research replies from other models (working notes, not source)
+Deep Research/
+
+# experiment outputs and envs
+data/
+results/
+results_*/
+# loose result JSONs returned from other machines, dropped at the repo root
+/data_gen.json
+/env_report.json
+/ocr_baseline.json
+models/
+.venv*/
+__pycache__/
+*.egg-info/
+*.pyc
+
+
+# co-author handoff bundle
+*.zip

@@ -1,0 +1,10 @@
+# Core (CPU) — everything that runs experiments TODAY.
+numpy>=1.24
+Pillow>=10.0
+scikit-learn>=1.3
+PyYAML>=6.0
+
+# Optional. See README_COAUTHOR.md.
+#   OCR baseline:  pip install -e ".[ocr]"   (also needs the tesseract binary)
+#   PDF export:    pip install -e ".[pdf]"
+#   Model core:    pip install -e ".[model]" (GPU machine)

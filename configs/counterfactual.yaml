@@ -1,0 +1,10 @@
+# Same as coauthor.yaml but with the positional shortcut defense ON.
+# Run the shortcut audit under both configs and compare: with counterfactual
+# layout the coordinate-only F1 should DROP toward chance.
+
+seed: 0
+data_dir: data/meddoc_cf
+n_per_split: 500
+languages: [en, ko, ja]
+counterfactual_layout: true
+render_images: true
