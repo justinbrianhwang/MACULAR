@@ -46,3 +46,5 @@ seeds: [0, 1, 2]
 # The privacy question moved to `erasure_comparison` (discrete attacks, frozen
 # features, closed-form erasure). Re-run this only to check that clipping fixed
 # the collapses -- not to draw a privacy conclusion.
+
+result_suffix: "_clipped"

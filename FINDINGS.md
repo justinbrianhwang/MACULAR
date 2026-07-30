@@ -100,13 +100,40 @@ params) was supposed to give it that ability.
 below base rate — and clinical macro-F1 exactly 0.0, while other seeds of the
 same config reached 0.99).
 
-Two independent defects, both since fixed:
+Two independent defects:
 - **Training instability.** Single-batch steps on 24 documents produced occasional
   huge gradients that destroyed the adapter in one update. `clip_grad_norm_(1.0)`
   added; collapsed runs are now flagged rather than silently averaged.
 - **Metric noise.** The leakage metric was a continuous cosine similarity, which
   drifts with training noise. Two runs of an *identical* config disagreed in sign
-  (+0.0224 vs −0.0163). No seed count fixes a metric with this property.
+  (+0.0224 vs −0.0163). No seed count fixes a metric with this property. This one
+  is not fixable by tuning; it is why §4 exists.
+
+### 2.2a After gradient clipping — and a fourth strike against the gate
+
+Re-running the same sweep with clipping (`results/lora_ablation_clipped.json`):
+**0 of 9 runs collapse**, against 2 of 9 before, and PII average precision never
+falls below 0.833. The fix works.
+
+What it exposes is more interesting than what it fixed. Clinical macro-F1 per
+seed:
+
+| Variant | seed 0 | seed 1 | seed 2 | std |
+|---|---:|---:|---:|---:|
+| full (gate + adversary) | 0.264 | 0.987 | 0.516 | 0.367 |
+| no_adversary (gate only) | 0.202 | 0.975 | 0.370 | 0.406 |
+| **no_gate (hard mask)** | **0.988** | **0.982** | **0.974** | **0.007** |
+
+Every variant containing the differentiable gate is unstable; the one without it
+is not, by a factor of ~50 in standard deviation. The mechanism explains it: the
+gate makes `z_safe` a function of the PII head, so early in training — when that
+head is still random — the clinical student is fed a randomly corrupted
+representation, and on a 24-document budget it sometimes never recovers. That is
+a property of coupling the two heads, not a bug.
+
+So the gate costs a third thing beyond utility and privacy: **optimisation
+stability**. Leakage numbers from this sweep remain unusable (std 0.013–0.095);
+the privacy question belongs to §4.
 
 ### 2.3 Claims retracted during this project
 
@@ -333,7 +360,8 @@ every difference:
    everywhere.** Not "did not help in our setup" — on every backbone some simpler
    mechanism beats it on both axes at once. On Ministral-3 the gate is the worst
    protected mechanism measured (ctx nonlinear 0.959 against an unprotected
-   0.975) while also costing utility.
+   0.975) while also costing utility. It additionally destabilises training
+   (§2.2a): clinical-F1 std 0.37–0.41 with the gate versus 0.007 without it.
 2. **Closed-form linear erasure does not transfer to unseen PII values on any
    backbone** (cross-family linear probe 0.889–0.944 against a 0.847 majority),
    and neither cheaper concepts, shrinkage, rank truncation, nor fitting across
