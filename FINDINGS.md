@@ -404,6 +404,39 @@ features throughout. §5 adds a real-scan arm.
 
 ---
 
+## 4b. Domain adaptation actually improves CJK OCR
+
+The one experiment here that *improves* OCR rather than measuring it. LoRA
+fine-tune Qwen2-VL-2B on medical-form region crops (family A), evaluate on
+family C — disjoint name, address, organisation, phone-prefix and ID pools, so a
+gain cannot be memorisation of the values. 1,440 training regions, 960 evaluation
+regions, 29M LoRA parameters, 2 epochs.
+
+| Language | CER before → after | exact match before → after |
+|---|---|---|
+| **ko** | 0.083 → **0.041** (−50%) | 0.886 → **0.950** |
+| **ja** | 0.091 → **0.063** (−31%) | 0.871 → **0.905** |
+| en | 0.036 → 0.049 (+36%) | 0.935 → 0.929 |
+| macro | 0.067 → **0.050** (−25%) | — |
+
+**CER and exact match move together**, which matters: had only CER improved, the
+gain would have been the model learning the output *format* (the unadapted model
+occasionally answers with grounding coordinates instead of text) rather than
+reading better.
+
+**The gain is CJK-specific and English regresses slightly.** That shape is the
+result, not a defect — English was already near ceiling (CER 0.036) and the
+adaptation trades a little of it for a large CJK gain. A paper claiming a
+multilingual medical-document contribution should report the regression, not
+average it away.
+
+**Caveats:** single seed, synthetic rendered text rather than real scans, and
+Qwen2-VL-2B rather than PaddleOCR-VL (whose remote modeling code does not load
+for generation under transformers 5.x). Validating the CJK gain on real scans
+needs XFUND (ja/zh), which FUNSD cannot provide.
+
+---
+
 ## 5. Real scanned pages (FUNSD)
 
 Everything above is synthetic, because no public scanned corpus carries PII

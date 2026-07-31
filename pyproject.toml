@@ -21,7 +21,8 @@ easyocr = ["easyocr>=1.7"]           # much stronger CJK; uses GPU if present
 paddleocr = ["paddleocr>=2.7"]       # PP-OCR, strong CJK (also needs paddlepaddle)
 pdf = ["reportlab>=4.0"]
 # GPU / model core. Install on the (stronger) co-author machine.
-model = ["torch>=2.2", "transformers>=4.45", "accelerate>=0.30"]
+# einops: PaddleOCR-VL's remote modeling code imports it at load time.
+model = ["torch>=2.2", "transformers>=4.45", "accelerate>=0.30", "einops>=0.7"]
 dev = ["pytest>=7.4"]
 
 [project.scripts]

@@ -30,7 +30,7 @@ DEFAULT_DATA = os.path.join("data", "meddoc")
 RUNNABLE = ["data_gen", "shortcut_audit", "ocr_baseline", "data_stats",
             "fetch_funsd", "fetch_xfund", "train_core", "ocr_propagation",
             "engine_downstream", "ocr_cache", "backbone_gate", "ablation",
-            "lora_ablation", "erasure_comparison", "prompted_vlm"]
+            "lora_ablation", "erasure_comparison", "prompted_vlm", "ocr_adapt"]
 SCAFFOLDED = ["train_macular", "backbone_swap"]
 
 
@@ -509,6 +509,39 @@ def _exp_prompted_vlm(cfg: dict) -> dict:
     return out
 
 
+def _exp_ocr_adapt(cfg: dict) -> dict:
+    """Domain-adapt the document VLM to medical forms and re-measure CER.
+
+    The project's only OCR-IMPROVEMENT experiment; everything else measures OCR
+    without changing it.
+    """
+    try:
+        from .models.ocr_adapt import finetune_and_measure
+    except ImportError:
+        return {"experiment": "ocr_adapt", "skipped": True,
+                "reason": 'needs torch + peft: pip install -e ".[model]" peft'}
+    train = _load_split(cfg, "train")
+    # Held out by generator family: train = A, test = C, so no PII value is
+    # shared and a CER drop cannot be memorisation.
+    evald = _load_split(cfg, "test")
+    try:
+        res = finetune_and_measure(
+            train, evald, cfg["data_dir"],
+            epochs=cfg.get("train_epochs", 2),
+            max_docs=cfg.get("max_docs", 60),
+            eval_max_docs=cfg.get("eval_max_docs", 40),
+            max_regions=cfg.get("max_regions", 24),
+            lr=cfg.get("lr", 1e-4), lora_r=cfg.get("lora_r", 16),
+            lora_alpha=cfg.get("lora_alpha", 32),
+            device=cfg.get("device", "cuda"), dtype=cfg.get("dtype", "bfloat16"),
+            seed=cfg.get("seed", 0))
+    except Exception as e:
+        res = {"error": f"{type(e).__name__}: {str(e)[:400]}"}
+    finally:
+        _free_gpu()
+    return {"experiment": "ocr_adapt", **res}
+
+
 def _agg_by_variant(rows, keys):
     """mean / std / n per variant, so a spread the size of the effect is visible.
 
@@ -655,6 +688,7 @@ _DISPATCH = {
     "lora_ablation": _exp_lora_ablation,
     "erasure_comparison": _exp_erasure_comparison,
     "prompted_vlm": _exp_prompted_vlm,
+    "ocr_adapt": _exp_ocr_adapt,
 }
 
 
