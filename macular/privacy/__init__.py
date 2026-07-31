@@ -30,7 +30,7 @@ the gate's mistake at a more sophisticated level.
 
 from .leace import LeaceEraser, fit_leace
 from .probes import probe_leakage, linear_probe, mlp_probe
-from .inversion import inversion_attack
+from .inversion import inversion_attack, prior_floor, attack_with_floor
 
 __all__ = ["LeaceEraser", "fit_leace", "probe_leakage", "linear_probe",
-           "mlp_probe", "inversion_attack"]
+           "mlp_probe", "inversion_attack", "prior_floor", "attack_with_floor"]

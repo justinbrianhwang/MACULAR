@@ -383,5 +383,48 @@ without discrete metrics the whole comparison is noise (§2.2). All four
 literature reviews report this protocol does not exist for document/VLM region
 features.
 
-**Caveats to carry:** three backbones, one dataset, one document domain, 120
-documents per split, a synthetic corpus, and frozen features throughout.
+**Caveats to carry:** three backbones, 120 documents per split, and frozen
+features throughout. §5 adds a real-scan arm.
+
+---
+
+## 5. Real scanned pages (FUNSD)
+
+Everything above is synthetic, because no public scanned corpus carries PII
+annotations — a gap all four literature reviews confirmed independently. FUNSD is
+real scanned paper with real scanner noise and handwriting. Its annotation scheme
+carries the distinction the protocol needs, so `answer` regions (filled-in values:
+names, phone numbers, dates) become the sensitive class and `question`/`header`
+(the printed form structure) the utility class. PaddleOCR-VL, 3 seeds, 606
+sensitive regions, majority baseline 0.652.
+
+| Mechanism | utility F1 | ctx linear | ctx nonlinear | inversion EM |
+|---|---:|---:|---:|---:|
+| none | 0.680 | 0.885 | 0.896 | 0.109 |
+| **hard_mask** | 0.674 | 0.873 | 0.866 | **0.008** |
+| gate | 0.696 | 0.892 | 0.894 | 0.011 |
+| leace | 0.643 | 0.846 | 0.869 | 0.101 |
+
+The prior floor is 0.000 for both decoders here — real form values are diverse
+enough that nothing is guessable from the text distribution alone — so every
+recovery number is fully attributable to the representation.
+
+**5.1 On real scans, LEACE does not protect the value at all.** Inversion
+exact-match is 0.101 against an unprotected 0.109; structural masking cuts it to
+0.008 and the gate to 0.011. An attacker reads back roughly the same fraction of
+real names and phone numbers from the LEACE-erased representation as from the
+unprotected one. This is the sharpest version of the §4 result and it is on real
+data: **erasing the linear concept direction does not remove the content.**
+
+**5.2 Nothing protects the role information on real scans.** Every mechanism sits
+at 0.866–0.894 nonlinear-probe accuracy against an unprotected 0.896 and a
+majority of 0.652. On synthetic pages contextual mixing pushed hard masking to
+chance; on real scans it does not, and the difference is worth explaining rather
+than hiding: FUNSD regions are far more heterogeneous, so role is predictable
+from geometry and neighbourhood alone.
+
+**5.3 What this arm does and does not support.** It supports the mechanism
+ranking on the reconstruction axis, on real scans, with real noise. It cannot
+speak to the erasure-transfer result: FUNSD is one document population with no
+disjoint value families, so §4's transfer failure remains a synthetic-data
+finding. The two must not be blurred in the paper.

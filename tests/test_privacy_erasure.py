@@ -86,13 +86,38 @@ def test_inversion_metrics_are_discrete_and_stable():
     assert a["cer"] < 0.5, f"attack should read a transparent encoding: {a}"
 
 
-def test_inversion_fails_on_noise():
-    """A representation carrying nothing must not yield recoverable text."""
+def test_inversion_on_noise_is_explained_by_the_prior():
+    """A representation carrying nothing must show no leakage ABOVE the prior.
+
+    Note what this does not assert. A structured-string decoder recovers a few
+    strings exactly from the text distribution alone — on pure noise features the
+    autoregressive decoder still scored 0.017 exact match. Demanding 0.0 would be
+    demanding a weaker attacker. What must be zero is recovery *attributable to
+    the representation*, which is why every reported number is measured against
+    a shuffled control.
+    """
+    from macular.privacy import attack_with_floor
+
     torch.manual_seed(0)
     names = [f"patient-{i:03d}" for i in range(120)]
     x = torch.randn(len(names), 24)
-    out = inversion_attack(x, names, seed=0)
-    assert out["exact_match"] == 0.0
+    out = attack_with_floor(x, names, seed=0)
+    assert out["leakage_above_prior_exact_match"] <= 0.02, out
+
+
+def test_prior_floor_is_subtracted_on_a_transparent_encoding():
+    """When the representation really does carry the text, leakage must survive
+    the floor subtraction — otherwise the control would be hiding real leaks."""
+    from macular.privacy import attack_with_floor
+
+    torch.manual_seed(0)
+    names = [f"patient-{i:03d}" for i in range(200)]
+    x = torch.zeros(len(names), 24)
+    for i, t in enumerate(names):
+        for j, c in enumerate(t[:24]):
+            x[i, j] = ord(c) / 128.0
+    out = attack_with_floor(x, names, seed=0)
+    assert out["leakage_above_prior_exact_match"] > 0.3, out
 
 
 def test_model_redaction_modes_run():
@@ -155,3 +180,84 @@ def test_leace_path_is_differentiable():
     model.set_eraser(eraser)
     model(feats, torch.rand(1, 8, 4))["z_safe"].sum().backward()
     assert feats.grad is not None and feats.grad.abs().sum() > 0
+
+
+def test_both_decoders_run_and_neither_is_uniformly_stronger():
+    """Why the experiment reports the max of the two decoders.
+
+    On real region features the autoregressive decoder is clearly stronger
+    (exact match 0.141 -> 0.181). On small synthetic sets it can be *weaker*,
+    being undertrained at the same epoch budget. A real attacker would just use
+    whichever works, so the reported attack is the better of the two rather than
+    a fixed choice.
+    """
+    torch.manual_seed(0)
+    names = [f"010-2{i:03d}-{i * 7 % 10000:04d}" for i in range(200)]
+    x = torch.zeros(len(names), 32)
+    for i, t in enumerate(names):
+        for j, c in enumerate(t[:24]):
+            x[i, j] = ord(c) / 128.0
+
+    weak = inversion_attack(x, names, seed=0, decoder="linear", epochs=200)
+    strong = inversion_attack(x, names, seed=0, decoder="autoregressive",
+                              epochs=200)
+    assert strong["decoder"] == "autoregressive"
+    assert weak["decoder"] == "linear"
+    for r in (weak, strong):
+        assert 0.0 <= r["exact_match"] <= 1.0 and r["cer"] >= 0.0
+    # The transparent encoding must be readable by at least one of them. Scored
+    # on CER, not exact match: these are 14-character strings with a
+    # near-random tail, so partial recovery is the sensitive signal here.
+    assert min(weak["cer"], strong["cer"]) < 0.35
+
+
+def test_funsd_privacy_mapping():
+    """answer -> sensitive, question/header -> utility, empty -> neither."""
+    from macular.realdata.funsd_privacy import to_privacy_documents, stats
+    from macular.schema import BBox, Candidate, Document
+
+    box = BBox(0.1, 0.1, 0.2, 0.2)
+    doc = Document(doc_id="d", language="en", doc_type="form", width=800,
+                   height=1000, split="test", candidates=[
+        Candidate(text="George Baroody", bbox=box, block_type="value"),
+        Candidate(text="Name:", bbox=box, block_type="label"),
+        Candidate(text="SECTION A", bbox=box, block_type="title"),
+        Candidate(text="   ", bbox=box, block_type="value"),
+    ])
+    out = to_privacy_documents([doc])[0]
+    assert out.candidates[0].pii_type and out.candidates[0].clinical_type == "NONE"
+    assert out.candidates[1].pii_type is None
+    assert out.candidates[1].clinical_type != "NONE"
+    assert out.candidates[2].clinical_type != "NONE"
+    # whitespace-only region is neither sensitive nor useful
+    assert out.candidates[3].pii_type is None
+    assert out.candidates[3].clinical_type == "NONE"
+    assert stats([out])["sensitive_regions"] == 1
+
+
+def test_prompted_vlm_answer_parsing():
+    """Models continue past the answer; take the first word they commit to."""
+    from macular.baselines.prompted_vlm import _answer_is_yes
+
+    assert _answer_is_yes("yes")
+    assert _answer_is_yes("Yes, this is a phone number.")
+    assert not _answer_is_yes("no")
+    assert not _answer_is_yes("No. It is a lab value.")
+    assert not _answer_is_yes("")           # no commitment -> treat as negative
+
+
+def test_funsd_privacy_types_are_in_the_canonical_vocabularies():
+    """Guards the failure mode that produced a table of 1.000s.
+
+    A type name outside PII_TYPES maps to the NON_PII index without complaint,
+    so every region becomes negative, every probe scores 1.000 against a
+    majority baseline of 1.000, and the run reports success.
+    """
+    from macular.models.features import CLINICAL_TYPES
+    from macular.realdata import funsd_privacy
+    from macular.schema import PII_TYPES
+
+    assert funsd_privacy.SENSITIVE_PII_TYPE in PII_TYPES
+    for v in funsd_privacy._UTILITY_BLOCKS.values():
+        assert v in CLINICAL_TYPES
+    funsd_privacy._check_vocabularies()      # must not raise

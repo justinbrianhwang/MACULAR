@@ -30,7 +30,7 @@ DEFAULT_DATA = os.path.join("data", "meddoc")
 RUNNABLE = ["data_gen", "shortcut_audit", "ocr_baseline", "data_stats",
             "fetch_funsd", "fetch_xfund", "train_core", "ocr_propagation",
             "engine_downstream", "ocr_cache", "backbone_gate", "ablation",
-            "lora_ablation", "erasure_comparison"]
+            "lora_ablation", "erasure_comparison", "prompted_vlm"]
 SCAFFOLDED = ["train_macular", "backbone_swap"]
 
 
@@ -141,10 +141,23 @@ def _load_split(cfg, split):
     from .schema import read_jsonl
     path = os.path.join(cfg["data_dir"], f"{split}.jsonl")
     if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"{path} not found. Run:  macular run data_gen  first."
-        )
-    return read_jsonl(path)
+        # FUNSD ships train/test with no val split; the privacy protocol needs a
+        # held-out half, so fall back to test rather than failing.
+        alt = os.path.join(cfg["data_dir"], "test.jsonl")
+        if split == "val" and os.path.exists(alt):
+            path = alt
+        else:
+            raise FileNotFoundError(
+                f"{path} not found. Run:  macular run data_gen  first."
+            )
+    docs = read_jsonl(path)
+    if cfg.get("annotate") == "funsd_privacy":
+        # Real scans have no PII labels; map FUNSD's answer/question/header roles
+        # onto sensitive/utility classes. See macular/realdata/funsd_privacy.py
+        # for what this can and cannot support.
+        from .realdata.funsd_privacy import to_privacy_documents
+        docs = to_privacy_documents(docs)
+    return docs
 
 
 def _exp_shortcut_audit(cfg: dict) -> dict:
@@ -466,6 +479,36 @@ def _free_gpu():
         pass
 
 
+def _exp_prompted_vlm(cfg: dict) -> dict:
+    """Zero-shot prompted-VLM PII detection — the baseline reviewers expect."""
+    try:
+        from .models import VLMBackbone, VLMBackboneConfig
+        from .baselines import prompted_vlm
+    except ImportError:
+        return {"experiment": "prompted_vlm", "skipped": True,
+                "reason": 'needs torch: pip install -e ".[model]"'}
+    docs = _load_split(cfg, cfg.get("split", "val"))
+    out = {"experiment": "prompted_vlm", "backbones": {}}
+    for fam in cfg.get("backbones", ["qwen2b"]):
+        bk = VLMBackbone(VLMBackboneConfig(
+            family=fam, device=cfg.get("device", "cuda"),
+            dtype=cfg.get("dtype", "bfloat16")))
+        try:
+            bk.load()
+            out["backbones"][fam] = prompted_vlm.run(
+                docs, cfg["data_dir"], bk,
+                max_docs=cfg.get("max_docs", 30),
+                max_regions=cfg.get("max_regions", 24))
+        except Exception as e:
+            out["backbones"][fam] = {
+                "error": f"{type(e).__name__}: {str(e)[:300]}"}
+        finally:
+            del bk
+            _free_gpu()
+        print(f"DONE {fam}", flush=True)
+    return out
+
+
 def _agg_by_variant(rows, keys):
     """mean / std / n per variant, so a spread the size of the effect is visible.
 
@@ -611,6 +654,7 @@ _DISPATCH = {
     "ablation": _exp_ablation,
     "lora_ablation": _exp_lora_ablation,
     "erasure_comparison": _exp_erasure_comparison,
+    "prompted_vlm": _exp_prompted_vlm,
 }
 
 

@@ -1,0 +1,28 @@
+# The erasure comparison on REAL scanned pages (FUNSD).
+#
+# Everything else in this comparison is synthetic, because no public scanned
+# corpus carries PII annotations. FUNSD is real scanned paper with real scanner
+# noise and handwriting, and its annotation scheme carries the distinction the
+# protocol needs: `answer` regions are filled-in VALUES (the thing to redact),
+# `question`/`header` are the printed form STRUCTURE (the utility to preserve).
+# macular/realdata/funsd_privacy.py does the mapping and documents its limits.
+#
+# WHAT THIS ARM SUPPORTS: that the mechanism ranking measured on synthetic pages
+# also holds on real scans with real noise.
+#
+# WHAT IT DOES NOT: the erasure-transfer result. FUNSD has one document
+# population and no disjoint value families, so the transfer question stays a
+# synthetic-data finding. Do not blur the two in the paper.
+
+data_dir: data/funsd
+annotate: funsd_privacy        # answer -> sensitive, question/header -> utility
+backbones: [paddleocr_vl]
+device: cuda
+dtype: bfloat16
+
+train_epochs: 80
+lr: 0.003
+max_docs: 120                  # FUNSD: 149 train / 50 test
+
+seeds: [0, 1, 2]
+result_suffix: "_funsd"

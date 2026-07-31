@@ -1,0 +1,21 @@
+# Zero-shot prompted-VLM PII detection.
+#
+# The baseline a 2026 reviewer asks for before reading anything else: why train
+# a head at all when a capable VLM can be asked directly?
+#
+# READ THE RESULT NARROWLY. This is DETECTION. It is not comparable to the
+# erasure comparison, which measures what an attacker recovers from the
+# representation -- a model that detects PII perfectly still hands downstream a
+# representation that can be inverted. Keep the two in separate tables.
+#
+# Cost: one generative forward pass per REGION, not per page, so the budget is
+# deliberately small. Raise max_docs only if you have the GPU-hours.
+
+data_dir: data/meddoc_cf_engines
+split: val
+backbones: [qwen2b]
+device: cuda
+dtype: bfloat16
+
+max_docs: 30
+max_regions: 24
