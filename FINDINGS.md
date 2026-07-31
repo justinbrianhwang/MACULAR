@@ -247,6 +247,22 @@ Post-relation-graph numbers — the deployed surface. Majority baseline 0.847.
 | | gate | 0.779 | 0.946 | 0.959 | 0.581 |
 | | leace | **0.897** | 0.877 | 0.896 | 0.623 |
 
+### 4.1c Value reconstruction, all four datasets on identical metrics
+
+Inversion exact-match, best of the two decoders, minus the shuffled-control prior
+floor (which came out 0.000 everywhere, so the columns are equal).
+
+| Mechanism | PaddleOCR-VL | Qwen2-VL-2B | Ministral-3 | FUNSD (real scans) |
+|---|---:|---:|---:|---:|
+| none | 0.157 | 0.013 | 0.083 | 0.109 |
+| **hard_mask** | **0.013** | **0.002** | **0.020** | **0.008** |
+| gate | 0.022 | 0.015 | 0.023 | 0.011 |
+| leace | 0.144 | 0.032 | 0.058 | 0.101 |
+
+Structural masking has the lowest recovery on **all four**. LEACE leaves the
+literal value nearly as recoverable as no protection at all on three of four
+(0.144 vs 0.157; 0.058 vs 0.083; 0.101 vs 0.109) — including the real scans.
+
 ### 4.2 What this says
 
 **1. The differentiable gate is dominated on both backbones.** On PaddleOCR-VL
