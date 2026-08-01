@@ -23,8 +23,12 @@ from .funsd_format import form_items_to_document
 
 _BASE = "https://github.com/doc-analysis/XFUND/releases/download/v1.0"
 
-# XFUND language code -> MACULAR language code (only those we score here).
-_LANG_MAP = {"ja": "ja", "es": "es"}
+# XFUND language code -> MACULAR language code. zh matters: it is the only other
+# CJK language with real scanned forms available to us (XFUND has no Korean, and
+# no public Korean scanned-form corpus exists), so it doubles the real-scan CJK
+# evidence from one language to two.
+_LANG_MAP = {"ja": "ja", "zh": "zh", "es": "es",
+             "fr": "fr", "it": "it", "de": "de", "pt": "pt"}
 
 
 def _download(url: str, dest: str) -> str:

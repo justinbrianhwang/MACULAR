@@ -54,6 +54,22 @@ def test_cer_is_aggregated_per_language_and_wer_is_null():
     assert rep["macro"]["n_regions"] == 2
 
 
+def test_halving_keeps_every_language_on_both_sides():
+    """A flat halving of the language-grouped jsonl trained on ja, evaluated on
+    es, and silently reported no ja row — the XFUND run that measured nothing."""
+    class _Doc:
+        def __init__(self, lang, i):
+            self.language, self.i = lang, i
+
+    docs = [_Doc("ja", i) for i in range(50)] + [_Doc("es", i) for i in range(50)]
+    train, evald = ocr_adapt.halve_by_language(docs)
+    for half in (train, evald):
+        assert {d.language for d in half} == {"ja", "es"}
+    assert len(train) + len(evald) == 100
+    assert not ({(d.language, d.i) for d in train}
+                & {(d.language, d.i) for d in evald})
+
+
 def test_cer_length_weighting_uses_gold_length():
     """A long region must not count the same as a two-character one."""
     class _Wrong(_FakeModel):

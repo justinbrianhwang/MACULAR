@@ -4,15 +4,18 @@ Proposal/
 # deep-research replies from other models (working notes, not source)
 Deep Research/
 
-# experiment outputs and envs
-data/
-results/
-results_*/
+# Experiment outputs and envs. LEADING SLASH IS LOAD BEARING: unanchored these
+# match any directory of that name at any depth, so `data/` and `models/` were
+# silently excluding macular/data/ and macular/models/ -- 11 source files,
+# including the model core and the whole data generator, were never committed.
+/data/
+/results/
+/results_*/
 # loose result JSONs returned from other machines, dropped at the repo root
 /data_gen.json
 /env_report.json
 /ocr_baseline.json
-models/
+/models/
 .venv*/
 __pycache__/
 *.egg-info/

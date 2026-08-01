@@ -146,6 +146,8 @@ Kept deliberately — each was stated confidently and was wrong.
 | "LoRA cuts leakage 74%" | Attributed to the gate, but hard masking achieved the same reduction. Not a gate effect. |
 | "The GRL adversary costs ≈0.08 clinical macro-F1" | Single seed. With 3 seeds the variants are not separable. |
 | "The gate is what costs utility" (frozen) | `full` vs `no_adversary` differ only by the adversary; on that single-seed read the adversary was the cost. Neither attribution survived seeding. |
+| "Adaptation makes the model read better, because CER and exact match move together" | True only in the pre-cap synthetic run. Under the comparable 512 px setting, exact match *falls* for synthetic ja and en and for 3 of 4 real-scan language-runs, while CER still drops — the signature of format control, not reading. §4b. |
+| "XFUND adaptation cuts CER by 0.98" | The split was language-grouped, so it trained on ja and evaluated on es. A cross-lingual transfer result mislabelled as domain adaptation, with the ja row missing entirely. §4b.3. |
 
 ---
 
@@ -404,36 +406,92 @@ features throughout. §5 adds a real-scan arm.
 
 ---
 
-## 4b. Domain adaptation actually improves CJK OCR
+## 4b. Domain adaptation lowers CER — but mostly by fixing the output format
 
 The one experiment here that *improves* OCR rather than measuring it. LoRA
-fine-tune Qwen2-VL-2B on medical-form region crops (family A), evaluate on
-family C — disjoint name, address, organisation, phone-prefix and ID pools, so a
-gain cannot be memorisation of the values. 1,440 training regions, 960 evaluation
-regions, 29M LoRA parameters, 2 epochs.
+fine-tune Qwen2-VL-2B (29M LoRA params, 2 epochs) on medical-form region crops,
+evaluate the same crops before and after in one paired run.
+
+All numbers below are measured with `MAX_CROP_SIDE = 512`. That cap is load
+bearing and was added late — see §4b.3 — so the synthetic run was repeated under
+it. The pre-cap synthetic numbers are kept in
+`results/ocr_adapt_uncapped_crops.json` and are **not** comparable to anything
+else here.
+
+### 4b.1 Synthetic rendered forms (train family A → eval family C)
+
+Disjoint name, address, organisation, phone-prefix and ID pools, so a gain
+cannot be memorisation of the values. 1,440 train / 960 eval regions.
 
 | Language | CER before → after | exact match before → after |
 |---|---|---|
-| **ko** | 0.083 → **0.041** (−50%) | 0.886 → **0.950** |
-| **ja** | 0.091 → **0.063** (−31%) | 0.871 → **0.905** |
-| en | 0.036 → 0.049 (+36%) | 0.935 → 0.929 |
-| macro | 0.067 → **0.050** (−25%) | — |
+| **ko** | 0.121 → **0.067** (−45%) | 0.836 → **0.878** |
+| ja | 0.104 → **0.075** (−28%) | 0.822 → 0.807 |
+| en | 0.047 → 0.073 (+55%) | 0.902 → 0.839 |
+| macro | 0.088 → **0.072** (−19%) | — |
 
-**CER and exact match move together**, which matters: had only CER improved, the
-gain would have been the model learning the output *format* (the unadapted model
-occasionally answers with grounding coordinates instead of text) rather than
-reading better.
+**Only Korean improves on both metrics.** Japanese buys a 28% CER cut at the
+cost of a small exact-match loss; English gets worse on both. English was
+already nearest ceiling, so trading it for CJK is a defensible shape — but it is
+a trade, and averaging it away would misreport the contribution.
 
-**The gain is CJK-specific and English regresses slightly.** That shape is the
-result, not a defect — English was already near ceiling (CER 0.036) and the
-adaptation trades a little of it for a large CJK gain. A paper claiming a
-multilingual medical-document contribution should report the regression, not
-average it away.
+### 4b.2 Real scanned forms (XFUND, language-stratified halves of one split)
 
-**Caveats:** single seed, synthetic rendered text rather than real scans, and
-Qwen2-VL-2B rather than PaddleOCR-VL (whose remote modeling code does not load
-for generation under transformers 5.x). Validating the CJK gain on real scans
-needs XFUND (ja/zh), which FUNSD cannot provide.
+Weaker held-out than §4b.1: XFUND ships a single split with no generated PII, so
+train and eval are halves of one document population. This answers "does
+adaptation help on real scans", not "does it generalise to unseen values".
+
+Two runs, because ja appears in both — the eval half is the identical 25 ja
+documents each time, so the only thing that changes is the co-training language.
+
+| Run | Language | CER before → after | ΔCER | exact match before → after | ΔEM |
+|---|---|---|---|---|---|
+| ja+es | es | 0.924 → 0.220 | **−0.704** | 0.520 → 0.233 | **−0.287** |
+| ja+es | ja | 0.846 → 0.276 | −0.569 | 0.400 → 0.390 | −0.010 |
+| ja+zh | ja | 0.846 → 0.408 | −0.437 | 0.400 → **0.438** | **+0.038** |
+| ja+zh | zh | 0.481 → 0.355 | −0.126 | 0.660 → 0.585 | −0.075 |
+
+**The CER gain tracks the baseline CER almost exactly** (0.924/0.846/0.846/0.481
+→ −0.704/−0.569/−0.437/−0.126). That is the signature of removing junk output,
+not of reading better. The baselines confirm it: CER 0.92 alongside exact match
+0.52 means the unadapted model transcribes half the regions perfectly and emits
+something far longer than the gold on the rest. Adaptation removes the junk.
+
+**Exact match falls in 3 of the 4 language-runs.** On real scans, adaptation
+reliably cuts CER and does **not** reliably improve exact transcription.
+
+**The same eval set moves differently depending on its co-training partner.**
+ja's ΔCER is −0.569 with es and −0.437 with zh — a 30% spread — and ΔEM changes
+sign. Any single-run claim of the form "adaptation improves ja by X" is not
+supported; this needs seeds and partners varied before it goes in a paper.
+
+### 4b.3 Two measurement faults found and fixed here
+
+**Language-grouped split.** `test.jsonl` is written language-grouped, so the
+XFUND fallback's flat `docs[:half], docs[half:]` trained on all-ja and evaluated
+on all-es: a cross-lingual transfer experiment that reported no ja row at all,
+and looked like a clean −0.98 CER win. Fixed by `halve_by_language()`
+(alternates within each language); regression test in `tests/test_ocr_adapt.py`.
+
+**Unbounded crops.** Real scans are far larger than rendered pages and `_crop`
+upscales 3× on top, so Qwen2-VL's dynamic resolution produced thousands of
+visual tokens per crop — an XFUND run sat at 100% GPU for 18 hours on a step
+count the synthetic run finished quickly. `MAX_CROP_SIDE = 512` fixed the
+throughput (0.70 s/region). But **all 960 synthetic crops exceeded 512** (max
+2,544 px), so the cap changed the synthetic measurement too: baseline CER rose
+(ko 0.083 → 0.121, ja 0.091 → 0.104, en 0.036 → 0.047) because downsampling
+costs real detail. The adaptation *effect* survived (macro ΔCER −0.017 both
+ways), the absolute levels did not.
+
+**Retracted from the earlier version of this section:** "CER and exact match
+move together." Under the comparable 512 px setting they do not — synthetic ja
+and en both lose exact match, and 3 of 4 real-scan language-runs do. That
+sentence was the evidence offered for "reading better rather than learning the
+format," so its retraction removes the evidence for the stronger claim.
+
+**Caveats:** single seed everywhere; Qwen2-VL-2B rather than PaddleOCR-VL (whose
+remote modeling code does not load for generation under transformers 5.x); no
+Korean real scans exist publicly, so ko is synthetic-only.
 
 ---
 
