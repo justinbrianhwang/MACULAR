@@ -9,7 +9,7 @@
 # disjoint PII generator families. This answers "does adaptation help on real
 # scans", NOT "does it generalise to unseen values" -- the synthetic run answers
 # that one. The halving MUST stay stratified: test.jsonl is language-grouped, so
-# a flat halving trains on ja and evaluates on es. See FINDINGS 4b.4.
+# a flat halving trains on ja and evaluates on es. See FINDINGS 4b.3.
 
 data_dir: data/xfund
 device: cuda
@@ -22,5 +22,5 @@ max_regions: 24
 lr: 0.0001
 lora_r: 16
 lora_alpha: 32
-seeds: [0, 1, 2]      # LoRA init + dropout only; the split is deterministic
-result_suffix: "_xfund"
+seeds: [0, 3, 4, 5]  # seed 0 REPEATS the previous run: same code, same seed, same machine -- pure run-to-run reproducibility check. 3,4,5 test whether the tight 0.099 ja cluster was luck.
+result_suffix: "_xfund_repro"

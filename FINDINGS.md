@@ -146,8 +146,10 @@ Kept deliberately — each was stated confidently and was wrong.
 | "LoRA cuts leakage 74%" | Attributed to the gate, but hard masking achieved the same reduction. Not a gate effect. |
 | "The GRL adversary costs ≈0.08 clinical macro-F1" | Single seed. With 3 seeds the variants are not separable. |
 | "The gate is what costs utility" (frozen) | `full` vs `no_adversary` differ only by the adversary; on that single-seed read the adversary was the cost. Neither attribution survived seeding. |
-| "Adaptation makes the model read better, because CER and exact match move together" | True only in the pre-cap synthetic run. Under the comparable 512 px setting, exact match *falls* for synthetic ja and en and for 3 of 4 real-scan language-runs, while CER still drops — the signature of format control, not reading. §4b. |
-| "XFUND adaptation cuts CER by 0.98" | The split was language-grouped, so it trained on ja and evaluated on es. A cross-lingual transfer result mislabelled as domain adaptation, with the ja row missing entirely. §4b.3. |
+| "Adaptation makes the model read better, because CER and exact match move together" — then its retraction, "adaptation is format control, not reading" | Both were single-run reads of a heavy-tailed distribution. Over seeds: synthetic improves both metrics in every language; real-scan ja improves EM massively in 6 of 7 runs (the two runs behind the format-control claim were tail draws); real-scan es genuinely does trade EM for CER. Neither slogan was right. §4b.1–4b.2. |
+| "XFUND adaptation cuts CER by 0.98" | The split was language-grouped, so it trained on ja and evaluated on es. A cross-lingual transfer result mislabelled as domain adaptation, with the ja row missing entirely. §4b.4. |
+| "Synthetic English regresses on both metrics under adaptation" | One seed. The 3-seed mean improves English on both metrics (ΔCER −0.029±0.013, ΔEM +0.065±0.009). §4b.1. |
+| "ja's outcome depends on its co-training partner (−0.569 with es vs −0.437 with zh)" | Stated from one run per partner. Run-to-run spread on an *identical* config and seed reached 6× (§4b.3), so 3 draws vs 7 cannot separate a partner effect from the tail. Withheld, not established. |
 
 ---
 
@@ -406,34 +408,35 @@ features throughout. §5 adds a real-scan arm.
 
 ---
 
-## 4b. Domain adaptation lowers CER — but mostly by fixing the output format
+## 4b. Domain adaptation helps — but individual runs are not reproducible
 
 The one experiment here that *improves* OCR rather than measuring it. LoRA
 fine-tune Qwen2-VL-2B (29M LoRA params, 2 epochs) on medical-form region crops,
-evaluate the same crops before and after in one paired run.
+evaluate the same crops before and after in one paired run. Everything below is
+3+ seeds per config; the single-seed §4b as originally written made two claims
+that did not survive seeding (see the retraction table, §2.3).
 
-All numbers below are measured with `MAX_CROP_SIDE = 512`. That cap is load
-bearing and was added late — see §4b.3 — so the synthetic run was repeated under
-it. The pre-cap synthetic numbers are kept in
-`results/ocr_adapt_uncapped_crops.json` and are **not** comparable to anything
-else here.
+All numbers are measured with `MAX_CROP_SIDE = 512`. That cap is load bearing
+and was added late — see §4b.4 — so the synthetic run was repeated under it. The
+pre-cap synthetic numbers are kept in `results/ocr_adapt_uncapped_crops.json`
+and are **not** comparable to anything else here.
 
-### 4b.1 Synthetic rendered forms (train family A → eval family C)
+### 4b.1 Synthetic rendered forms (train family A → eval family C, 3 seeds)
 
 Disjoint name, address, organisation, phone-prefix and ID pools, so a gain
 cannot be memorisation of the values. 1,440 train / 960 eval regions.
 
-| Language | CER before → after | exact match before → after |
-|---|---|---|
-| **ko** | 0.121 → **0.067** (−45%) | 0.836 → **0.878** |
-| ja | 0.104 → **0.075** (−28%) | 0.822 → 0.807 |
-| en | 0.047 → 0.073 (+55%) | 0.902 → 0.839 |
-| macro | 0.088 → **0.072** (−19%) | — |
+| Language | CER before | after (per seed) | ΔCER mean±std | ΔEM mean±std |
+|---|---|---|---|---|
+| ko | 0.121 | 0.016 / 0.017 / 0.071 | **−0.086**±0.026 | **+0.084**±0.009 |
+| ja | 0.104 | 0.015 / 0.042 / 0.073 | **−0.061**±0.024 | **+0.090**±0.028 |
+| en | 0.047 | 0.006 / 0.013 / 0.036 | **−0.029**±0.013 | **+0.065**±0.009 |
+| macro | 0.088 | — | −0.057±0.020 | — |
 
-**Only Korean improves on both metrics.** Japanese buys a 28% CER cut at the
-cost of a small exact-match loss; English gets worse on both. English was
-already nearest ceiling, so trading it for CJK is a defensible shape — but it is
-a trade, and averaging it away would misreport the contribution.
+**All three languages improve on both CER and exact match, every seed.** The
+single-seed version of this table said English regresses on both metrics; that
+was one draw. The CJK gains are still the largest, consistent with the
+adaptation mattering most where the baseline is weakest.
 
 ### 4b.2 Real scanned forms (XFUND, language-stratified halves of one split)
 
@@ -441,31 +444,72 @@ Weaker held-out than §4b.1: XFUND ships a single split with no generated PII, s
 train and eval are halves of one document population. This answers "does
 adaptation help on real scans", not "does it generalise to unseen values".
 
-Two runs, because ja appears in both — the eval half is the identical 25 ja
-documents each time, so the only thing that changes is the co-training language.
+Pooling every training run of the ja+es config under the current code (two
+invocations, 7 trained adapters — including one repeated seed, which is the
+point of §4b.3), against a baseline of ja CER 0.846 / EM 0.400 and es CER 0.924
+/ EM 0.520:
 
-| Run | Language | CER before → after | ΔCER | exact match before → after | ΔEM |
-|---|---|---|---|---|---|
-| ja+es | es | 0.924 → 0.220 | **−0.704** | 0.520 → 0.233 | **−0.287** |
-| ja+es | ja | 0.846 → 0.276 | −0.569 | 0.400 → 0.390 | −0.010 |
-| ja+zh | ja | 0.846 → 0.408 | −0.437 | 0.400 → **0.438** | **+0.038** |
-| ja+zh | zh | 0.481 → 0.355 | −0.126 | 0.660 → 0.585 | −0.075 |
+| Language | after CER, per trained adapter | after EM, per trained adapter |
+|---|---|---|
+| ja | 0.099 0.099 0.104 0.114 0.139 0.147 **0.630** | 0.824 0.798 0.789 0.759 0.751 0.729 **0.100** |
+| es | 0.132 0.170 0.227 0.299 0.329 0.375 0.399 | 0.538 0.358 0.293 0.260 0.237 0.233 0.190 |
 
-**The CER gain tracks the baseline CER almost exactly** (0.924/0.846/0.846/0.481
-→ −0.704/−0.569/−0.437/−0.126). That is the signature of removing junk output,
-not of reading better. The baselines confirm it: CER 0.92 alongside exact match
-0.52 means the unadapted model transcribes half the regions perfectly and emits
-something far longer than the gold on the rest. Adaptation removes the junk.
+And the ja+zh config (3 seeds), baseline zh CER 0.481 / EM 0.660:
 
-**Exact match falls in 3 of the 4 language-runs.** On real scans, adaptation
-reliably cuts CER and does **not** reliably improve exact transcription.
+| Language | after CER | after EM |
+|---|---|---|
+| ja | 0.155 / 0.243 / 0.332 | 0.575 / 0.612 / 0.452 |
+| zh | 0.109 / 0.215 / 0.254 | 0.835 / 0.803 / 0.643 |
 
-**The same eval set moves differently depending on its co-training partner.**
-ja's ΔCER is −0.569 with es and −0.437 with zh — a 30% spread — and ΔEM changes
-sign. Any single-run claim of the form "adaptation improves ja by X" is not
-supported; this needs seeds and partners varied before it goes in a paper.
+What survives across every run:
 
-### 4b.3 Two measurement faults found and fixed here
+- **CER improves in all 20 trained-adapter × language outcomes**, usually by a
+  lot (ja median 0.846 → 0.114). Even the worst outlier (0.630) beats baseline.
+- **ja exact match usually improves massively** (0.400 → 0.73–0.82 in 6 of 7
+  runs) — the earlier claim that real-scan adaptation is "format control, not
+  reading" was based on two single runs that are now recognisable as tail draws.
+  But the seventh run collapsed EM to 0.100, *below* baseline.
+- **es exact match usually degrades** (0.520 → 0.19–0.36 in 6 of 7 runs). For
+  Spanish the format-control story still fits: CER down, exact transcription
+  worse. The per-language direction of the EM effect is real and opposite.
+
+**What does not survive: any per-run number.** See §4b.3.
+
+**Partner-language effect: not separable.** ja beside es clusters at CER
+0.099–0.147 (plus one 0.630); ja beside zh sits at 0.155–0.332. Suggestive, but
+with a run distribution this heavy-tailed, 3 draws against 7 cannot distinguish
+"zh co-training hurts ja" from "three mid-tail draws". Withheld.
+
+### 4b.3 Identical seed, identical code, different result
+
+The reproducibility control: re-run the ja+es config with seeds [0, 3, 4, 5],
+where **seed 0 exactly repeats the previous invocation** — same code, same data,
+same machine, same seed.
+
+Seed 0 produced ja after-CER **0.099** in the first invocation and **0.630** in
+the repeat. Its three sibling seeds in the same repeat run landed at 0.114–0.147,
+so the repeat is an outlier *within its own run* — while sharing every
+controllable input with a run that was not. Train loss does not flag it: the
+divergent run's loss history (0.218 → 0.114) is inside the range of the normal
+runs (0.208–0.218 → 0.099–0.118). The failure is invisible until evaluation.
+
+The mechanism consistent with everything observed: bf16 GPU non-determinism
+compounds over ~2,400 training steps, and the outcome distribution is
+heavy-tailed — most runs land in a good basin, an occasional run diverges
+badly. The same non-determinism showed up in the LoRA privacy ablation (§2.2)
+as sign flips on identical configs; here it produces a 6× CER spread on an
+identical seed.
+
+Consequences:
+
+- A seed is not a reproducibility mechanism for this training setup. Nominal
+  seeding does not pin the outcome, so "seed N gave X" is not a reportable fact.
+- The reporting unit must be the across-run distribution (median + range +
+  outlier rate), not a mean±std over seeds that pretends draws are labelled.
+- Any deployment of this adaptation needs a post-training eval gate, because
+  train loss cannot tell a diverged adapter from a good one.
+
+### 4b.4 Two measurement faults found and fixed here
 
 **Language-grouped split.** `test.jsonl` is written language-grouped, so the
 XFUND fallback's flat `docs[:half], docs[half:]` trained on all-ja and evaluated
@@ -483,15 +527,10 @@ throughput (0.70 s/region). But **all 960 synthetic crops exceeded 512** (max
 costs real detail. The adaptation *effect* survived (macro ΔCER −0.017 both
 ways), the absolute levels did not.
 
-**Retracted from the earlier version of this section:** "CER and exact match
-move together." Under the comparable 512 px setting they do not — synthetic ja
-and en both lose exact match, and 3 of 4 real-scan language-runs do. That
-sentence was the evidence offered for "reading better rather than learning the
-format," so its retraction removes the evidence for the stronger claim.
-
-**Caveats:** single seed everywhere; Qwen2-VL-2B rather than PaddleOCR-VL (whose
-remote modeling code does not load for generation under transformers 5.x); no
-Korean real scans exist publicly, so ko is synthetic-only.
+**Caveats:** Qwen2-VL-2B rather than PaddleOCR-VL (whose remote modeling code
+does not load for generation under transformers 5.x); no Korean real scans
+exist publicly, so ko is synthetic-only; XFUND train/eval halves are one
+document population, so the real-scan numbers carry no unseen-value guarantee.
 
 ---
 
