@@ -1,0 +1,28 @@
+# Domain adaptation on REAL scanned forms, CJK only (XFUND: Japanese + Chinese).
+#
+# Companion to configs/ocr_adapt_xfund.yaml (ja + es). Two reasons to run both:
+#   - zh is the second real-scan CJK language available to us (XFUND has no
+#     Korean, and no public Korean scanned-form corpus exists), so this doubles
+#     the real-scan CJK evidence.
+#   - ja appears in BOTH runs on different document halves. That is a free
+#     replication check: if ja moves the same direction twice, the effect is not
+#     an artefact of one split.
+#
+# Same weaker held-out as the ja/es run: XFUND ships one split, so train and eval
+# are language-stratified halves of one population, not disjoint PII generator
+# families. Answers "does adaptation help on real scans", not "does it
+# generalise to unseen values" -- the synthetic run answers that one.
+
+data_dir: data/xfund_cjk
+device: cuda
+dtype: bfloat16
+
+train_epochs: 2
+max_docs: 50
+eval_max_docs: 50
+max_regions: 24
+lr: 0.0001
+lora_r: 16
+lora_alpha: 32
+seeds: [6, 7, 8, 9]  # 4 more draws so ja-beside-zh has 7, matching ja-beside-es 7. Decides the withheld partner-language effect (FINDINGS 4b.2) instead of leaving it suggestive.
+result_suffix: "_xfund_cjk_more"

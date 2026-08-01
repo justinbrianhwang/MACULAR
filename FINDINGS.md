@@ -149,7 +149,7 @@ Kept deliberately — each was stated confidently and was wrong.
 | "Adaptation makes the model read better, because CER and exact match move together" — then its retraction, "adaptation is format control, not reading" | Both were single-run reads of a heavy-tailed distribution. Over seeds: synthetic improves both metrics in every language; real-scan ja improves EM massively in 6 of 7 runs (the two runs behind the format-control claim were tail draws); real-scan es genuinely does trade EM for CER. Neither slogan was right. §4b.1–4b.2. |
 | "XFUND adaptation cuts CER by 0.98" | The split was language-grouped, so it trained on ja and evaluated on es. A cross-lingual transfer result mislabelled as domain adaptation, with the ja row missing entirely. §4b.4. |
 | "Synthetic English regresses on both metrics under adaptation" | One seed. The 3-seed mean improves English on both metrics (ΔCER −0.029±0.013, ΔEM +0.065±0.009). §4b.1. |
-| "ja's outcome depends on its co-training partner (−0.569 with es vs −0.437 with zh)" | Stated from one run per partner. Run-to-run spread on an *identical* config and seed reached 6× (§4b.3), so 3 draws vs 7 cannot separate a partner effect from the tail. Withheld, not established. |
+| "ja's outcome depends on its co-training partner (−0.569 with es vs −0.437 with zh)" | Stated from one run per partner, with the *direction* backwards: at 7 draws per side, es co-training beats zh co-training on the identical ja eval half (EM p = 0.023, CER p = 0.051; §4b.2). The single-run numbers that prompted the claim were both tail draws. |
 
 ---
 
@@ -454,16 +454,17 @@ point of §4b.3), against a baseline of ja CER 0.846 / EM 0.400 and es CER 0.924
 | ja | 0.099 0.099 0.104 0.114 0.139 0.147 **0.630** | 0.824 0.798 0.789 0.759 0.751 0.729 **0.100** |
 | es | 0.132 0.170 0.227 0.299 0.329 0.375 0.399 | 0.538 0.358 0.293 0.260 0.237 0.233 0.190 |
 
-And the ja+zh config (3 seeds), baseline zh CER 0.481 / EM 0.660:
+And the ja+zh config (7 trained adapters across two invocations), baseline zh
+CER 0.481 / EM 0.660:
 
-| Language | after CER | after EM |
+| Language | after CER, per trained adapter | after EM, per trained adapter |
 |---|---|---|
-| ja | 0.155 / 0.243 / 0.332 | 0.575 / 0.612 / 0.452 |
-| zh | 0.109 / 0.215 / 0.254 | 0.835 / 0.803 / 0.643 |
+| ja | 0.129 0.155 0.171 0.198 0.200 0.243 0.332 | 0.666 0.575 0.666 0.580 0.664 0.612 0.452 |
+| zh | 0.080 0.109 0.113 0.125 0.185 0.215 0.254 | 0.857 0.835 0.807 0.790 0.790 0.803 0.643 |
 
 What survives across every run:
 
-- **CER improves in all 20 trained-adapter × language outcomes**, usually by a
+- **CER improves in all 28 trained-adapter × language outcomes**, usually by a
   lot (ja median 0.846 → 0.114). Even the worst outlier (0.630) beats baseline.
 - **ja exact match usually improves massively** (0.400 → 0.73–0.82 in 6 of 7
   runs) — the earlier claim that real-scan adaptation is "format control, not
@@ -475,10 +476,16 @@ What survives across every run:
 
 **What does not survive: any per-run number.** See §4b.3.
 
-**Partner-language effect: not separable.** ja beside es clusters at CER
-0.099–0.147 (plus one 0.630); ja beside zh sits at 0.155–0.332. Suggestive, but
-with a run distribution this heavy-tailed, 3 draws against 7 cannot distinguish
-"zh co-training hurts ja" from "three mid-tail draws". Withheld.
+**Partner-language effect: real on exact match, borderline on CER (7 vs 7).**
+The ja eval half is identical in both configs, so the co-training language is
+the only difference. Four more ja+zh seeds brought both sides to 7 draws. Exact
+two-sided Mann-Whitney: EM p = 0.023 (median 0.759 beside es vs 0.612 beside
+zh), CER p = 0.051 (median 0.114 vs 0.198) — the CER test just misses because
+the es side contains the 0.630 diverged run, which cannot be excluded post hoc.
+Direction is the counterintuitive one: Japanese is helped *more* by Spanish
+co-training than by Chinese. No mechanism is claimed; one mundane candidate is
+that same-script zh crops compete for the shared CJK reading capacity while es
+does not.
 
 ### 4b.3 Identical seed, identical code, different result
 
