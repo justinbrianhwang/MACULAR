@@ -153,25 +153,12 @@ HALVED_SPLIT_NOTE = (
 _WER_NOTE = " WER is null for ko/ja/zh: whitespace word error is meaningless."
 
 
-def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
-                         max_docs=60, eval_max_docs=40, max_regions=24,
-                         lr=1e-4, lora_r=16, lora_alpha=32, device="cuda",
-                         dtype="bfloat16", seed=0, model_id=None,
-                         split_note=FAMILY_SPLIT_NOTE):
-    """Baseline CER -> LoRA adaptation -> adapted CER, in one paired run."""
+def _train_one_seed(proc, model, train_items, eval_items, seed, epochs, lr,
+                    lora_r, lora_alpha):
+    """Attach a fresh LoRA, train it, and evaluate. Mutates ``model`` in place."""
     from peft import LoraConfig, get_peft_model
 
     torch.manual_seed(seed)
-    proc, model = _load(device, dtype, model_id)
-
-    eval_items = list(_regions(eval_docs, data_dir, eval_max_docs, max_regions))
-    train_items = list(_regions(train_docs, data_dir, max_docs, max_regions))
-    if not eval_items or not train_items:
-        raise ValueError("no non-empty regions found — check data_dir")
-
-    print(f"regions: train {len(train_items)}, eval {len(eval_items)}", flush=True)
-    before = evaluate_cer(proc, model, eval_items)
-
     peft_cfg = LoraConfig(
         r=lora_r, lora_alpha=lora_alpha, lora_dropout=0.05, bias="none",
         target_modules=_targets(model))
@@ -186,7 +173,8 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
         total = 0.0
         for i, (crop, gold, _lang) in enumerate(train_items):
             if i % 200 == 0:
-                print(f"  train epoch {ep} step {i}/{len(train_items)}", flush=True)
+                print(f"  seed {seed} epoch {ep} step {i}/{len(train_items)}",
+                      flush=True)
             opt.zero_grad()
             loss = model(**_batch(proc, model, crop, gold)).loss
             loss.backward()
@@ -195,24 +183,82 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
             opt.step()
             total += float(loss)
         history.append(total / len(train_items))
+    return evaluate_cer(proc, model, eval_items), history, trainable
 
-    after = evaluate_cer(proc, model, eval_items)
 
+def _mean_std(values):
+    n = len(values)
+    mean = sum(values) / n
+    var = sum((v - mean) ** 2 for v in values) / n
+    return {"mean": mean, "std": var ** 0.5, "n": n}
+
+
+def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
+                         max_docs=60, eval_max_docs=40, max_regions=24,
+                         lr=1e-4, lora_r=16, lora_alpha=32, device="cuda",
+                         dtype="bfloat16", seed=0, seeds=None, model_id=None,
+                         split_note=FAMILY_SPLIT_NOTE):
+    """Baseline CER -> LoRA adaptation -> adapted CER, paired, over N seeds.
+
+    Seeds are not optional decoration here. On XFUND, ja appears in two runs on
+    an IDENTICAL eval half and its CER delta was -0.569 next to es but -0.437
+    next to zh, with the exact-match delta changing sign — so a single-seed,
+    single-partner per-language number is not evidence of anything.
+
+    The baseline is evaluated ONCE, outside the seed loop: no LoRA is attached
+    yet and decoding is greedy, so it is seed-independent by construction and
+    re-running it would cost ~15 min per seed for an identical answer.
+    """
+    seeds = list(seeds) if seeds else [seed]
+    proc, model = _load(device, dtype, model_id)
+
+    eval_items = list(_regions(eval_docs, data_dir, eval_max_docs, max_regions))
+    train_items = list(_regions(train_docs, data_dir, max_docs, max_regions))
+    if not eval_items or not train_items:
+        raise ValueError("no non-empty regions found — check data_dir")
+
+    print(f"regions: train {len(train_items)}, eval {len(eval_items)}", flush=True)
+    before = evaluate_cer(proc, model, eval_items)
     langs = sorted(set(before) - {"macro"})
+
+    per_seed = []
+    for i, s in enumerate(seeds):
+        if i:
+            # get_peft_model injects adapter layers into the base model in
+            # place, so seed i+1 would otherwise train on top of seed i's
+            # weights. Reloading costs ~30s against a ~50 min run.
+            del model
+            torch.cuda.empty_cache()
+            proc, model = _load(device, dtype, model_id)
+        after, history, trainable = _train_one_seed(
+            proc, model, train_items, eval_items, s, epochs, lr, lora_r,
+            lora_alpha)
+        per_seed.append({
+            "seed": s, "loss_history": history, "cer_after": after,
+            # Negative delta = adaptation helped.
+            "cer_delta": {l: after[l]["cer"] - before[l]["cer"]
+                          for l in langs if l in after},
+            "cer_delta_macro": after["macro"]["cer"] - before["macro"]["cer"],
+            "exact_match_delta": {l: after[l]["exact_match"]
+                                  - before[l]["exact_match"]
+                                  for l in langs if l in after},
+        })
+
     return {
+        "seeds": seeds,
         "n_train_regions": len(train_items),
         "n_eval_regions": len(eval_items),
         "lora_trainable_params": trainable,
-        "loss_history": history,
         "cer_before": before,
-        "cer_after": after,
-        # Negative delta = adaptation helped.
-        "cer_delta": {lang: after[lang]["cer"] - before[lang]["cer"]
-                      for lang in langs if lang in after},
-        "cer_delta_macro": after["macro"]["cer"] - before["macro"]["cer"],
-        "exact_match_delta": {lang: after[lang]["exact_match"]
-                              - before[lang]["exact_match"]
-                              for lang in langs if lang in after},
+        "per_seed": per_seed,
+        "cer_delta_agg": {
+            l: _mean_std([r["cer_delta"][l] for r in per_seed if l in r["cer_delta"]])
+            for l in langs},
+        "cer_delta_macro_agg": _mean_std([r["cer_delta_macro"] for r in per_seed]),
+        "exact_match_delta_agg": {
+            l: _mean_std([r["exact_match_delta"][l] for r in per_seed
+                          if l in r["exact_match_delta"]])
+            for l in langs},
         "note": split_note + _WER_NOTE,
     }
 

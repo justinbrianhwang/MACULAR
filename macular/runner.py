@@ -544,7 +544,8 @@ def _exp_ocr_adapt(cfg: dict) -> dict:
             lr=cfg.get("lr", 1e-4), lora_r=cfg.get("lora_r", 16),
             lora_alpha=cfg.get("lora_alpha", 32),
             device=cfg.get("device", "cuda"), dtype=cfg.get("dtype", "bfloat16"),
-            seed=cfg.get("seed", 0), split_note=split_note)
+            seed=cfg.get("seed", 0), seeds=cfg.get("seeds"),
+            split_note=split_note)
     except Exception as e:
         res = {"error": f"{type(e).__name__}: {str(e)[:400]}"}
     finally:

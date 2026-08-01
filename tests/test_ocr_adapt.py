@@ -70,6 +70,40 @@ def test_halving_keeps_every_language_on_both_sides():
                 & {(d.language, d.i) for d in evald})
 
 
+def test_each_seed_gets_fresh_base_weights_and_one_baseline(monkeypatch):
+    """get_peft_model injects adapters in place, so reusing the model across
+    seeds would silently make seed N train on top of seed N-1 — a 6-epoch run
+    wearing a 3-seed costume. The baseline must run once: no adapter is
+    attached and decoding is greedy, so it cannot vary by seed."""
+    loaded, trained, baselines = [], [], []
+
+    def fake_load(device, dtype, model_id):
+        m = object()
+        loaded.append(m)
+        return "proc", m
+
+    def fake_eval(proc, model, items, **kw):
+        baselines.append(model)
+        return {"en": {"cer": 0.5, "exact_match": 0.5}, "macro": {"cer": 0.5}}
+
+    def fake_train(proc, model, tr, ev, seed, *a):
+        trained.append((seed, model))
+        return fake_eval(proc, model, ev), [0.1], 7
+
+    monkeypatch.setattr(ocr_adapt, "_load", fake_load)
+    monkeypatch.setattr(ocr_adapt, "_regions",
+                        lambda *a: [(None, "x", "en")])
+    monkeypatch.setattr(ocr_adapt, "evaluate_cer", fake_eval)
+    monkeypatch.setattr(ocr_adapt, "_train_one_seed", fake_train)
+
+    res = ocr_adapt.finetune_and_measure([], [], "d", seeds=[0, 1, 2])
+
+    assert [s for s, _ in trained] == [0, 1, 2]
+    assert len({id(m) for _, m in trained}) == 3      # never reused
+    assert len(baselines) == 1 + 3                    # one baseline + one per seed
+    assert res["cer_delta_agg"]["en"]["n"] == 3
+
+
 def test_cer_length_weighting_uses_gold_length():
     """A long region must not count the same as a two-character one."""
     class _Wrong(_FakeModel):
