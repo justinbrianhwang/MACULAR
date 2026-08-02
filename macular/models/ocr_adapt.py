@@ -62,6 +62,25 @@ def _prompt_text(proc):
 MAX_CROP_SIDE = 512
 
 
+def interleave_by_language(docs):
+    """Round-robin the languages so a head-slice keeps all of them.
+
+    Everything downstream slices ``docs[:max_docs]``, and corpus files can be
+    language-grouped (XFUND's is). A grouped file plus a head-slice is silently
+    monolingual: the syn2real run evaluated on 50 ja documents and reported no
+    es at all — the same failure family as the flat halving in
+    halve_by_language, one code path over.
+    """
+    by_lang: dict[str, list] = {}
+    for d in docs:
+        by_lang.setdefault(d.language, []).append(d)
+    pools = [by_lang[k] for k in sorted(by_lang)]
+    out = []
+    for i in range(max(len(p) for p in pools)):
+        out.extend(p[i] for p in pools if i < len(p))
+    return out
+
+
 def halve_by_language(docs):
     """Split one document population into (train, eval), alternating per language.
 

@@ -518,7 +518,7 @@ def _exp_ocr_adapt(cfg: dict) -> dict:
     try:
         from .models.ocr_adapt import (CROSS_CORPUS_NOTE, FAMILY_SPLIT_NOTE,
                                        HALVED_SPLIT_NOTE, finetune_and_measure,
-                                       halve_by_language)
+                                       halve_by_language, interleave_by_language)
     except ImportError:
         return {"experiment": "ocr_adapt", "skipped": True,
                 "reason": 'needs torch + peft: pip install -e ".[model]" peft'}
@@ -548,6 +548,9 @@ def _exp_ocr_adapt(cfg: dict) -> dict:
             # on real scans, not whether it generalises to unseen values.
             train, evald = halve_by_language(evald)
             split_note = HALVED_SPLIT_NOTE
+    # Corpus files can be language-grouped and everything downstream slices
+    # docs[:max_docs]; interleaving keeps every language on both sides.
+    train, evald = interleave_by_language(train), interleave_by_language(evald)
     try:
         res = finetune_and_measure(
             train, evald, cfg["data_dir"],

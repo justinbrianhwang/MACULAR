@@ -104,6 +104,24 @@ def test_each_seed_gets_fresh_base_weights_and_one_baseline(monkeypatch):
     assert res["cer_delta_agg"]["en"]["n"] == 3
 
 
+def test_interleave_makes_head_slices_multilingual():
+    """A language-grouped corpus plus docs[:N] slicing must not go silently
+    monolingual — the syn2real run evaluated 50 ja docs and zero es."""
+    class _Doc:
+        def __init__(self, lang, i):
+            self.language, self.i = lang, i
+
+    docs = [_Doc("ja", i) for i in range(50)] + [_Doc("es", i) for i in range(50)]
+    out = ocr_adapt.interleave_by_language(docs)
+    assert len(out) == 100
+    head = out[:10]
+    assert {d.language for d in head} == {"es", "ja"}
+    assert sum(d.language == "ja" for d in head) == 5
+    # within-language order preserved
+    ja = [d.i for d in out if d.language == "ja"]
+    assert ja == sorted(ja)
+
+
 def test_cer_length_weighting_uses_gold_length():
     """A long region must not count the same as a two-character one."""
     class _Wrong(_FakeModel):
