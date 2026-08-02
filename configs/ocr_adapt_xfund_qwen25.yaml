@@ -1,0 +1,20 @@
+# Second fine-tuning backbone: Qwen2.5-VL-3B on the XFUND ja/es config.
+# Answers the "single model" reviewer objection: does the adaptation effect —
+# and the run-to-run irreproducibility of FINDINGS 4b.3 — replicate on a
+# different (newer, larger) VLM? Everything except model_id matches
+# configs/ocr_adapt_xfund.yaml.
+
+data_dir: data/xfund
+model_id: Qwen/Qwen2.5-VL-3B-Instruct
+device: cuda
+dtype: bfloat16
+
+train_epochs: 2
+max_docs: 50
+eval_max_docs: 50
+max_regions: 24
+lr: 0.0001
+lora_r: 16
+lora_alpha: 32
+seeds: [0, 1, 2]
+result_suffix: "_xfund_qwen25"

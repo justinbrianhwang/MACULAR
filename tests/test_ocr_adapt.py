@@ -86,7 +86,7 @@ def test_each_seed_gets_fresh_base_weights_and_one_baseline(monkeypatch):
         baselines.append(model)
         return {"en": {"cer": 0.5, "exact_match": 0.5}, "macro": {"cer": 0.5}}
 
-    def fake_train(proc, model, tr, ev, seed, *a):
+    def fake_train(proc, model, tr, ev, seed, *a, **kw):
         trained.append((seed, model))
         return fake_eval(proc, model, ev), [0.1], 7
 

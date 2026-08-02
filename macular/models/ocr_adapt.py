@@ -93,8 +93,14 @@ def _regions(docs, data_dir, max_docs, max_regions):
 
 
 @torch.no_grad()
-def evaluate_cer(proc, model, items, max_new_tokens=48):
-    """Per-language CER over (crop, gold, language) triples."""
+def evaluate_cer(proc, model, items, max_new_tokens=48, pairs_out=None):
+    """Per-language CER over (crop, gold, language) triples.
+
+    ``pairs_out``: optional list; receives (language, pred, gold) per region.
+    Saved into results so the eval-gate question — how few regions does it take
+    to detect a diverged adapter (§4b.3)? — is answerable offline instead of
+    needing reruns.
+    """
     model.eval()
     per_lang: dict[str, list] = {}
     for i, (crop, gold, lang) in enumerate(items):
@@ -108,6 +114,8 @@ def evaluate_cer(proc, model, items, max_new_tokens=48):
         pred = proc.batch_decode(out[:, inputs["input_ids"].shape[1]:],
                                  skip_special_tokens=True)[0].strip()
         per_lang.setdefault(lang, []).append((pred, gold))
+        if pairs_out is not None:
+            pairs_out.append((lang, pred, gold))
 
     report = {}
     num = den = 0
@@ -150,11 +158,15 @@ HALVED_SPLIT_NOTE = (
     "Train and eval are language-stratified halves of ONE document population "
     "(this corpus ships a single split), so a CER drop shows adaptation helps "
     "on these scans, NOT that it generalises to unseen values.")
+CROSS_CORPUS_NOTE = (
+    "Train and eval come from DIFFERENT corpora ({train} -> {eval}): different "
+    "documents, rendering/scanning processes, and value distributions. The "
+    "strongest held-out in this project.")
 _WER_NOTE = " WER is null for ko/ja/zh: whitespace word error is meaningless."
 
 
 def _train_one_seed(proc, model, train_items, eval_items, seed, epochs, lr,
-                    lora_r, lora_alpha):
+                    lora_r, lora_alpha, pairs_out=None):
     """Attach a fresh LoRA, train it, and evaluate. Mutates ``model`` in place."""
     from peft import LoraConfig, get_peft_model
 
@@ -183,7 +195,8 @@ def _train_one_seed(proc, model, train_items, eval_items, seed, epochs, lr,
             opt.step()
             total += float(loss)
         history.append(total / len(train_items))
-    return evaluate_cer(proc, model, eval_items), history, trainable
+    return (evaluate_cer(proc, model, eval_items, pairs_out=pairs_out),
+            history, trainable)
 
 
 def _mean_std(values):
@@ -197,7 +210,7 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
                          max_docs=60, eval_max_docs=40, max_regions=24,
                          lr=1e-4, lora_r=16, lora_alpha=32, device="cuda",
                          dtype="bfloat16", seed=0, seeds=None, model_id=None,
-                         split_note=FAMILY_SPLIT_NOTE):
+                         eval_data_dir=None, split_note=FAMILY_SPLIT_NOTE):
     """Baseline CER -> LoRA adaptation -> adapted CER, paired, over N seeds.
 
     Seeds are not optional decoration here. On XFUND, ja appears in two runs on
@@ -212,13 +225,15 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
     seeds = list(seeds) if seeds else [seed]
     proc, model = _load(device, dtype, model_id)
 
-    eval_items = list(_regions(eval_docs, data_dir, eval_max_docs, max_regions))
+    eval_items = list(_regions(eval_docs, eval_data_dir or data_dir,
+                               eval_max_docs, max_regions))
     train_items = list(_regions(train_docs, data_dir, max_docs, max_regions))
     if not eval_items or not train_items:
         raise ValueError("no non-empty regions found — check data_dir")
 
     print(f"regions: train {len(train_items)}, eval {len(eval_items)}", flush=True)
-    before = evaluate_cer(proc, model, eval_items)
+    before_pairs = []
+    before = evaluate_cer(proc, model, eval_items, pairs_out=before_pairs)
     langs = sorted(set(before) - {"macro"})
 
     per_seed = []
@@ -230,11 +245,13 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
             del model
             torch.cuda.empty_cache()
             proc, model = _load(device, dtype, model_id)
+        after_pairs = []
         after, history, trainable = _train_one_seed(
             proc, model, train_items, eval_items, s, epochs, lr, lora_r,
-            lora_alpha)
+            lora_alpha, pairs_out=after_pairs)
         per_seed.append({
             "seed": s, "loss_history": history, "cer_after": after,
+            "eval_pairs": after_pairs,
             # Negative delta = adaptation helped.
             "cer_delta": {l: after[l]["cer"] - before[l]["cer"]
                           for l in langs if l in after},
@@ -250,6 +267,7 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
         "n_eval_regions": len(eval_items),
         "lora_trainable_params": trainable,
         "cer_before": before,
+        "eval_pairs_before": before_pairs,
         "per_seed": per_seed,
         "cer_delta_agg": {
             l: _mean_std([r["cer_delta"][l] for r in per_seed if l in r["cer_delta"]])

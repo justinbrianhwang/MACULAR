@@ -1,0 +1,16 @@
+# LoRA rank ablation: r=8 (alpha kept at 2r, matching the r=16/alpha=32
+# default, so the effective scale alpha/r stays 2 and only capacity varies).
+
+data_dir: data/xfund
+device: cuda
+dtype: bfloat16
+
+train_epochs: 2
+max_docs: 50
+eval_max_docs: 50
+max_regions: 24
+lr: 0.0001
+lora_r: 8
+lora_alpha: 16
+seeds: [0, 1, 2]
+result_suffix: "_xfund_r8"

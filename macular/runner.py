@@ -516,24 +516,38 @@ def _exp_ocr_adapt(cfg: dict) -> dict:
     without changing it.
     """
     try:
-        from .models.ocr_adapt import (FAMILY_SPLIT_NOTE, HALVED_SPLIT_NOTE,
-                                       finetune_and_measure, halve_by_language)
+        from .models.ocr_adapt import (CROSS_CORPUS_NOTE, FAMILY_SPLIT_NOTE,
+                                       HALVED_SPLIT_NOTE, finetune_and_measure,
+                                       halve_by_language)
     except ImportError:
         return {"experiment": "ocr_adapt", "skipped": True,
                 "reason": 'needs torch + peft: pip install -e ".[model]" peft'}
-    evald = _load_split(cfg, "test")
-    try:
-        # Synthetic data: held out by GENERATOR FAMILY (train = A, test = C), so
-        # no PII value is shared and a CER drop cannot be memorisation.
-        train = _load_split(cfg, "train")
-        split_note = FAMILY_SPLIT_NOTE
-    except FileNotFoundError:
-        # XFUND ships only the split we convert, so fall back to a document-level
-        # halving, stratified by language. Weaker: the two halves are one
-        # population, so this checks whether adaptation helps on real scans, not
-        # whether it generalises to unseen values.
-        train, evald = halve_by_language(evald)
-        split_note = HALVED_SPLIT_NOTE
+    eval_dir = cfg.get("eval_data_dir")
+    if eval_dir:
+        # Cross-corpus: train on one corpus, evaluate on a different one
+        # (synthetic -> real scans, or the reverse). The whole train corpus
+        # trains; nothing is halved because the eval documents live elsewhere.
+        evald = _load_split({**cfg, "data_dir": eval_dir}, "test")
+        try:
+            train = _load_split(cfg, "train")
+        except FileNotFoundError:
+            train = _load_split(cfg, "test")
+        split_note = CROSS_CORPUS_NOTE.format(train=cfg["data_dir"],
+                                              eval=eval_dir)
+    else:
+        evald = _load_split(cfg, "test")
+        try:
+            # Synthetic data: held out by GENERATOR FAMILY (train = A, test = C),
+            # so no PII value is shared and a CER drop cannot be memorisation.
+            train = _load_split(cfg, "train")
+            split_note = FAMILY_SPLIT_NOTE
+        except FileNotFoundError:
+            # XFUND ships only the split we convert, so fall back to a
+            # document-level halving, stratified by language. Weaker: the two
+            # halves are one population, so this checks whether adaptation helps
+            # on real scans, not whether it generalises to unseen values.
+            train, evald = halve_by_language(evald)
+            split_note = HALVED_SPLIT_NOTE
     try:
         res = finetune_and_measure(
             train, evald, cfg["data_dir"],
@@ -545,6 +559,7 @@ def _exp_ocr_adapt(cfg: dict) -> dict:
             lora_alpha=cfg.get("lora_alpha", 32),
             device=cfg.get("device", "cuda"), dtype=cfg.get("dtype", "bfloat16"),
             seed=cfg.get("seed", 0), seeds=cfg.get("seeds"),
+            model_id=cfg.get("model_id"), eval_data_dir=eval_dir,
             split_note=split_note)
     except Exception as e:
         res = {"error": f"{type(e).__name__}: {str(e)[:400]}"}

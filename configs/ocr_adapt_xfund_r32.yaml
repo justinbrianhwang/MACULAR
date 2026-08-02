@@ -1,0 +1,15 @@
+# LoRA rank ablation: r=32 (alpha kept at 2r; see ocr_adapt_xfund_r8.yaml).
+
+data_dir: data/xfund
+device: cuda
+dtype: bfloat16
+
+train_epochs: 2
+max_docs: 50
+eval_max_docs: 50
+max_regions: 24
+lr: 0.0001
+lora_r: 32
+lora_alpha: 64
+seeds: [0, 1, 2]
+result_suffix: "_xfund_r32"

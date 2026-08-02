@@ -1,0 +1,18 @@
+# Epoch ablation: 1 epoch instead of 2, on the XFUND ja/es config.
+# Motivated by the synthetic runs, where train loss ROSE in epoch 2 for all
+# three seeds — if 1 epoch matches 2, the default is over-training; if the
+# diverged-run rate drops, epoch 2 is where the tail comes from.
+
+data_dir: data/xfund
+device: cuda
+dtype: bfloat16
+
+train_epochs: 1
+max_docs: 50
+eval_max_docs: 50
+max_regions: 24
+lr: 0.0001
+lora_r: 16
+lora_alpha: 32
+seeds: [0, 1, 2]
+result_suffix: "_xfund_ep1"
