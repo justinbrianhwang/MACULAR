@@ -523,6 +523,10 @@ XFUND fallback's flat `docs[:half], docs[half:]` trained on all-ja and evaluated
 on all-es: a cross-lingual transfer experiment that reported no ja row at all,
 and looked like a clean −0.98 CER win. Fixed by `halve_by_language()`
 (alternates within each language); regression test in `tests/test_ocr_adapt.py`.
+The same failure family hit a second code path: the cross-corpus route (§4b.7)
+head-slices `docs[:max_docs]`, so its first syn→real run evaluated on 50 ja
+documents and zero es. Fixed by `interleave_by_language()` on both train and
+eval in every branch.
 
 **Unbounded crops.** Real scans are far larger than rendered pages and `_crop`
 upscales 3× on top, so Qwen2-VL's dynamic resolution produced thousands of
@@ -535,9 +539,90 @@ costs real detail. The adaptation *effect* survived (macro ΔCER −0.017 both
 ways), the absolute levels did not.
 
 **Caveats:** Qwen2-VL-2B rather than PaddleOCR-VL (whose remote modeling code
-does not load for generation under transformers 5.x); no Korean real scans
-exist publicly, so ko is synthetic-only; XFUND train/eval halves are one
-document population, so the real-scan numbers carry no unseen-value guarantee.
+does not load for generation under transformers 5.x) for the main runs — but
+see §4b.6 for a second backbone; no Korean real scans exist publicly, so ko is
+synthetic-only; XFUND train/eval halves are one document population, so the
+real-scan numbers carry no unseen-value guarantee.
+
+### 4b.5 Less is more: epochs and rank (XFUND ja+es, 3 seeds each)
+
+Motivated by two loose ends: train loss *rose* in epoch 2 of every synthetic
+seed, and r=16 was never justified. Defaults for comparison: 2 epochs, r=16
+(after-CER ja 0.099–0.630, es 0.132–0.399; es EM 0.19–0.36 in 6/7 runs).
+
+| Variant | ja after CER | ja after EM | es after CER | es after EM |
+|---|---|---|---|---|
+| **1 epoch** (r16) | 0.067 0.083 0.172 | 0.537–0.804 | 0.136 0.154 0.161 | **0.407–0.638** |
+| **r=8** (2 ep) | 0.061 0.080 0.139 | 0.651–0.806 | **0.077–0.154** | **0.468–0.667** |
+| r=16, 2 ep (default) | 0.099–0.147, one 0.630 | 0.729–0.824, one 0.100 | 0.132–0.399 | 0.190–0.538 |
+| **r=32** (2 ep) | 0.086 0.203 **0.335** | 0.271–0.784 | 0.165 0.378 **0.558** | 0.098–0.577 |
+
+α/r held at 2 throughout, so rank varies capacity only. The pattern is
+monotone: **shrinking the training budget (1 epoch) or capacity (r=8) keeps the
+CER gain, softens the es exact-match degradation, and tightens the spread;
+growing capacity (r=32) makes everything worse and wilder** — r=32's worst es
+run lands at EM 0.098, far below the 0.520 baseline. The paper should default
+to r=8 and 1–2 epochs and present r=16/2ep as the ablation, not the other way
+around. (3 seeds per variant: the spread ordering is consistent across four
+variants, but tail *rates* per variant are not estimable at n=3.)
+
+### 4b.6 Second backbone: Qwen2.5-VL-3B (XFUND ja+es, 3 seeds)
+
+The "single model" objection, and a harder test: Qwen2.5-VL-3B's baseline is
+~7× stronger (ja CER 0.118 / EM 0.590 vs 2B's 0.846 / 0.400), so there is no
+junk-output cliff for adaptation to fix.
+
+| Language | baseline | after CER | after EM |
+|---|---|---|---|
+| ja | 0.118 / 0.590 | 0.075 / **0.226** / 0.047 | 0.826 / 0.597 / 0.831 |
+| es | 0.171 / 0.615 | 0.107 / 0.153 / 0.063 | 0.700 / 0.602 / 0.740 |
+
+Both phenomena replicate. The gain: 2 of 3 seeds roughly halve CER and raise
+EM on both languages, so adaptation is not just weak-model repair. The tail:
+seed 1's ja lands at 0.226 — **worse than its own baseline**, the first
+observed case of adaptation hurting CER — while its siblings sit at
+0.047/0.075. The heavy tail is not a Qwen2-VL-2B quirk.
+
+### 4b.7 Cross-corpus transfer: synthetic ↔ real
+
+The question that decides whether synthetic-only Korean adaptation means
+anything: does adaptation learned on rendered forms transfer to real scans?
+Train and eval corpora share no documents, rendering/scanning process, or value
+distribution — the strongest held-out in the project.
+
+**Synthetic → real (ja, 3 seeds, ja-only eval pass):** baseline 0.937 / EM
+0.396 → after CER 0.202 / 0.257 / 0.266, EM 0.395 / 0.485 / 0.522. Training on
+*rendered* text recovers most of the CER gain that in-domain real-scan training
+achieves (~0.24 vs ~0.12 against a 0.94 baseline), and roughly a third of the
+EM gain (to ~0.5 vs ~0.78). A model that has never seen a scanner learns mostly
+transferable reading, partially transferable exactness.
+
+**Real → synthetic (3 seeds):** baseline ko 0.121 / ja 0.104 / en 0.047 →
+seeds 0 and 1 *degrade* every language (ko 0.140/0.141, ja 0.133/0.135, en
+0.082/0.250); seed 2 improves everything dramatically (ko 0.015, ja 0.021, en
+0.016, EM 0.955–0.982). The transfer is **asymmetric**: syn→real helps in 3/3
+runs, real→syn helps in 1/3 and hurts in 2/3 — with the heavy tail appearing on
+the *good* side for once. Clean synthetic text is apparently in-distribution
+enough for scan-trained adapters only when the draw is lucky.
+
+For the paper: the syn→real direction is the useful one, and it is the
+direction that works. Synthetic-only Korean adaptation is defensible.
+
+### 4b.8 Sizing the eval gate
+
+§4b.3 concluded a post-training eval gate is mandatory. The saved per-region
+(pred, gold) pairs put a number on it: bootstrap gate sets of n regions (paired
+sampling — one gate set, both adapters run on it), and measure how often the
+gate ranks a diverged adapter worse.
+
+| Detection task | n=10 | n=25 | n=50 | n=100 | n=200 |
+|---|---|---|---|---|---|
+| Subtle: qwen25 ja diverged seed vs baseline (ΔCER 0.11) | 0.851 | 0.919 | 0.969 | **0.997** | 1.000 |
+| Gross: r32 es diverged seed vs sibling (ΔCER 0.39) | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+
+**A 100-region gate catches the subtlest observed divergence 99.7% of the
+time; gross divergence is caught with 10.** At 0.7 s/region the gate costs
+~70 seconds. Script: `scripts/eval_gate_analysis.py`.
 
 ---
 
