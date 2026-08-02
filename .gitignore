@@ -24,3 +24,6 @@ __pycache__/
 
 # co-author handoff bundle
 *.zip
+
+# paper draft (submission handled outside the repo)
+/paper/
