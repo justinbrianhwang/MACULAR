@@ -590,12 +590,23 @@ anything: does adaptation learned on rendered forms transfer to real scans?
 Train and eval corpora share no documents, rendering/scanning process, or value
 distribution — the strongest held-out in the project.
 
-**Synthetic → real (ja, 3 seeds, ja-only eval pass):** baseline 0.937 / EM
-0.396 → after CER 0.202 / 0.257 / 0.266, EM 0.395 / 0.485 / 0.522. Training on
-*rendered* text recovers most of the CER gain that in-domain real-scan training
-achieves (~0.24 vs ~0.12 against a 0.94 baseline), and roughly a third of the
-EM gain (to ~0.5 vs ~0.78). A model that has never seen a scanner learns mostly
-transferable reading, partially transferable exactness.
+**Synthetic → real (3 seeds):** on the interleaved ja+es eval half — baselines
+ja 1.073 / EM 0.385, es 1.218 / EM 0.493:
+
+| Language | after CER | after EM |
+|---|---|---|
+| ja | 0.236 / 0.310 / 0.295 | 0.522 / 0.540 / 0.573 |
+| es | 0.171 / 0.254 / 0.167 | 0.497 / 0.433 / 0.533 |
+
+Training on *rendered* text recovers most of the CER gain that in-domain
+real-scan training achieves (ja ~0.28 vs ~0.12 against a ~1.0 baseline), and
+part of the EM gain (ja to ~0.55 vs ~0.78). A first ja-only pass (before the
+interleave fix, 50 ja docs) agrees: 0.937 → 0.202–0.266. And the es row is the
+surprise: **Spanish does not exist in the synthetic training corpus at all**,
+yet es CER drops to in-domain levels (0.17–0.25 vs in-domain 0.13–0.40) with EM
+roughly flat — the adaptation transfers across corpus *and* language, which
+fits it being mostly a transferable reading/format skill rather than
+language-specific memorisation.
 
 **Real → synthetic (3 seeds):** baseline ko 0.121 / ja 0.104 / en 0.047 →
 seeds 0 and 1 *degrade* every language (ko 0.140/0.141, ja 0.133/0.135, en
