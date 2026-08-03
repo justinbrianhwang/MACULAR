@@ -190,10 +190,16 @@ def _train_one_seed(proc, model, train_items, eval_items, seed, epochs, lr,
     from peft import LoraConfig, get_peft_model
 
     torch.manual_seed(seed)
+    base_dtype = next(model.parameters()).dtype
     peft_cfg = LoraConfig(
         r=lora_r, lora_alpha=lora_alpha, lora_dropout=0.05, bias="none",
         use_dora=use_dora, target_modules=_targets(model))
     model = get_peft_model(model, peft_cfg)
+    if use_dora:
+        # peft's DoRA magnitude vectors initialise in float32, which crashes a
+        # bf16 forward ("Input type FloatTensor and weight type BFloat16Type").
+        # Plain LoRA matches the base dtype on its own.
+        model = model.to(base_dtype)
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     opt = torch.optim.AdamW(
