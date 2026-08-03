@@ -1,0 +1,27 @@
+# Domain adaptation on REAL scanned forms (XFUND, Japanese + Spanish).
+#
+# The synthetic run showed CJK CER dropping (ko 0.121 -> 0.067, ja 0.104 ->
+# 0.075) but on rendered text. This checks the same adaptation on genuine scans
+# with genuine scanner noise.
+#
+# WEAKER HELD-OUT THAN THE SYNTHETIC RUN. XFUND ships one split, so train and
+# eval are language-stratified halves of one document population rather than
+# disjoint PII generator families. This answers "does adaptation help on real
+# scans", NOT "does it generalise to unseen values" -- the synthetic run answers
+# that one. The halving MUST stay stratified: test.jsonl is language-grouped, so
+# a flat halving trains on ja and evaluates on es. See FINDINGS 4b.4.
+
+data_dir: data/xfund
+device: cuda
+dtype: bfloat16
+
+train_epochs: 2
+max_docs: 50
+eval_max_docs: 50
+max_regions: 24
+lr: 0.0001
+lora_r: 256
+lora_alpha: 32
+seeds: [0, 1, 2]
+use_vera: true
+result_suffix: "_xfund_vera"

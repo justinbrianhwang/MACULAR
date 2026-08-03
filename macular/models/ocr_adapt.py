@@ -185,21 +185,38 @@ _WER_NOTE = " WER is null for ko/ja/zh: whitespace word error is meaningless."
 
 
 def _train_one_seed(proc, model, train_items, eval_items, seed, epochs, lr,
-                    lora_r, lora_alpha, pairs_out=None, use_dora=False):
-    """Attach a fresh LoRA, train it, and evaluate. Mutates ``model`` in place."""
+                    lora_r, lora_alpha, pairs_out=None, use_dora=False,
+                    use_rslora=False, init_lora_weights=True, use_vera=False):
+    """Attach a fresh adapter, train it, and evaluate. Mutates ``model``."""
     from peft import LoraConfig, get_peft_model
 
     torch.manual_seed(seed)
     base_dtype = next(model.parameters()).dtype
-    peft_cfg = LoraConfig(
-        r=lora_r, lora_alpha=lora_alpha, lora_dropout=0.05, bias="none",
-        use_dora=use_dora, target_modules=_targets(model))
+    # "proj" also names the vision patch-embed Conv3d. Plain LoRA/DoRA wrap
+    # conv layers fine; PiSSA init and VeRA support only nn.Linear, so they
+    # get the linear-only target list.
+    linear_only = use_vera or (isinstance(init_lora_weights, str)
+                               and init_lora_weights.startswith("pissa"))
+    targets = _linear_targets(model) if linear_only else _targets(model)
+    if use_vera:
+        # VeRA shares one frozen random (A, B) pair across layers and trains
+        # only per-layer scaling vectors — the extreme of the "less capacity
+        # is better" trend from the rank ablation.
+        from peft import VeraConfig
+        peft_cfg = VeraConfig(r=lora_r, vera_dropout=0.05,
+                              target_modules=targets)
+    else:
+        peft_cfg = LoraConfig(
+            r=lora_r, lora_alpha=lora_alpha, lora_dropout=0.05, bias="none",
+            use_dora=use_dora, use_rslora=use_rslora,
+            init_lora_weights=init_lora_weights,
+            target_modules=targets)
     model = get_peft_model(model, peft_cfg)
-    if use_dora:
-        # peft's DoRA magnitude vectors initialise in float32, which crashes a
-        # bf16 forward ("Input type FloatTensor and weight type BFloat16Type").
-        # Plain LoRA matches the base dtype on its own.
-        model = model.to(base_dtype)
+    # peft initialises DoRA magnitudes (and some other variants' extras) in
+    # float32, which crashes a bf16 forward ("Input type FloatTensor and
+    # weight type BFloat16Type"). Casting to the base dtype is harmless for
+    # plain LoRA, so do it unconditionally.
+    model = model.to(base_dtype)
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     opt = torch.optim.AdamW(
@@ -235,7 +252,8 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
                          max_docs=60, eval_max_docs=40, max_regions=24,
                          lr=1e-4, lora_r=16, lora_alpha=32, device="cuda",
                          dtype="bfloat16", seed=0, seeds=None, model_id=None,
-                         eval_data_dir=None, use_dora=False,
+                         eval_data_dir=None, use_dora=False, use_rslora=False,
+                         init_lora_weights=True, use_vera=False,
                          split_note=FAMILY_SPLIT_NOTE):
     """Baseline CER -> LoRA adaptation -> adapted CER, paired, over N seeds.
 
@@ -274,7 +292,9 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
         after_pairs = []
         after, history, trainable = _train_one_seed(
             proc, model, train_items, eval_items, s, epochs, lr, lora_r,
-            lora_alpha, pairs_out=after_pairs, use_dora=use_dora)
+            lora_alpha, pairs_out=after_pairs, use_dora=use_dora,
+            use_rslora=use_rslora, init_lora_weights=init_lora_weights,
+            use_vera=use_vera)
         per_seed.append({
             "seed": s, "loss_history": history, "cer_after": after,
             "eval_pairs": after_pairs,
@@ -318,3 +338,19 @@ def _targets(model):
     if not hit:
         raise RuntimeError(f"no LoRA targets found; linear leaves were {names}")
     return hit
+
+
+def _linear_targets(model):
+    """_targets, minus any name that ALSO matches a non-Linear module.
+
+    peft matches target names by suffix, so a name shared between a Linear
+    and a conv (Qwen2-VL's "proj" is both the attention out-proj and the
+    patch-embed Conv3d) wraps both — fatal for adapters that support only
+    nn.Linear (PiSSA init, VeRA).
+    """
+    import torch.nn as nn
+    hit = set(_targets(model))
+    for n, m in model.named_modules():
+        if n.split(".")[-1] in hit and not isinstance(m, nn.Linear):
+            hit.discard(n.split(".")[-1])
+    return sorted(hit)
