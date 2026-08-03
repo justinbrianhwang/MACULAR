@@ -566,6 +566,26 @@ to r=8 and 1–2 epochs and present r=16/2ep as the ablation, not the other way
 around. (3 seeds per variant: the spread ordering is consistent across four
 variants, but tail *rates* per variant are not estimable at n=3.)
 
+**DoRA (co-author suggestion, 3 seeds each).** Weight-decomposed LoRA at the
+same ranks, same everything else (peft `use_dora=True`; its float32 magnitude
+vectors must be cast to the base dtype or a bf16 forward crashes):
+
+| Variant | ja after CER | ja after EM | es after CER | es after EM |
+|---|---|---|---|---|
+| DoRA r=16 | 0.110 0.146 0.151 | 0.635–0.764 | 0.128–0.184 | **0.550–0.663** |
+| DoRA r=8 | 0.098 0.177 **0.448** | 0.266–0.749 | 0.148–0.202 | 0.323–0.568 |
+
+Two findings. **DoRA at r=16 genuinely fixes the es exact-match collapse**
+(baseline 0.520 → 0.55–0.66, above baseline in 3/3 seeds, where LoRA r=16
+degraded it in 6/7 runs; exact 3-vs-7 Mann–Whitney p = 0.017) with a tighter
+spread and no diverged draw. So the co-author's intuition was right at the
+default rank — magnitude/direction decoupling helps. **But it does not stack
+with the rank fix**: DoRA r=8 is worse than LoRA r=8 everywhere and contains a
+bad tail draw (ja 0.448 / EM 0.266). The two remedies are alternative routes to
+the same place, and the simpler one (halve the rank) reaches it with the best
+ja CER of any cell and half the adapter parameters. LoRA r=8 stays the
+recommended default; DoRA r=16 is the verified runner-up.
+
 ### 4b.6 Second backbone: Qwen2.5-VL-3B (XFUND ja+es, 3 seeds)
 
 The "single model" objection, and a harder test: Qwen2.5-VL-3B's baseline is

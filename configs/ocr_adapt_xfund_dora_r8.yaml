@@ -1,0 +1,23 @@
+# DoRA vs LoRA, on the XFUND ja/es config. Co-author suggestion: DoRA
+# (weight-decomposed LoRA -- magnitude and direction trained separately) is
+# the successor method and typically closes the LoRA-vs-full-FT gap at low
+# rank. This answers it with data instead of opinion: same everything as
+# configs/ocr_adapt_xfund.yaml except use_dora, compared against the pooled
+# 7-run LoRA distribution. Two things to watch: median CER/EM, and whether
+# the heavy tail (FINDINGS 4b.3) shrinks -- a stabilisation claim would be
+# worth more than a median claim.
+
+data_dir: data/xfund
+device: cuda
+dtype: bfloat16
+
+train_epochs: 2
+max_docs: 50
+eval_max_docs: 50
+max_regions: 24
+lr: 0.0001
+lora_r: 8
+lora_alpha: 16
+use_dora: true
+seeds: [0, 1, 2]
+result_suffix: "_xfund_dora_r8"
