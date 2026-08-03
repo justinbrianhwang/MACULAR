@@ -185,14 +185,14 @@ _WER_NOTE = " WER is null for ko/ja/zh: whitespace word error is meaningless."
 
 
 def _train_one_seed(proc, model, train_items, eval_items, seed, epochs, lr,
-                    lora_r, lora_alpha, pairs_out=None):
+                    lora_r, lora_alpha, pairs_out=None, use_dora=False):
     """Attach a fresh LoRA, train it, and evaluate. Mutates ``model`` in place."""
     from peft import LoraConfig, get_peft_model
 
     torch.manual_seed(seed)
     peft_cfg = LoraConfig(
         r=lora_r, lora_alpha=lora_alpha, lora_dropout=0.05, bias="none",
-        target_modules=_targets(model))
+        use_dora=use_dora, target_modules=_targets(model))
     model = get_peft_model(model, peft_cfg)
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -229,7 +229,8 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
                          max_docs=60, eval_max_docs=40, max_regions=24,
                          lr=1e-4, lora_r=16, lora_alpha=32, device="cuda",
                          dtype="bfloat16", seed=0, seeds=None, model_id=None,
-                         eval_data_dir=None, split_note=FAMILY_SPLIT_NOTE):
+                         eval_data_dir=None, use_dora=False,
+                         split_note=FAMILY_SPLIT_NOTE):
     """Baseline CER -> LoRA adaptation -> adapted CER, paired, over N seeds.
 
     Seeds are not optional decoration here. On XFUND, ja appears in two runs on
@@ -267,7 +268,7 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
         after_pairs = []
         after, history, trainable = _train_one_seed(
             proc, model, train_items, eval_items, s, epochs, lr, lora_r,
-            lora_alpha, pairs_out=after_pairs)
+            lora_alpha, pairs_out=after_pairs, use_dora=use_dora)
         per_seed.append({
             "seed": s, "loss_history": history, "cer_after": after,
             "eval_pairs": after_pairs,

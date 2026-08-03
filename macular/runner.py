@@ -563,7 +563,7 @@ def _exp_ocr_adapt(cfg: dict) -> dict:
             device=cfg.get("device", "cuda"), dtype=cfg.get("dtype", "bfloat16"),
             seed=cfg.get("seed", 0), seeds=cfg.get("seeds"),
             model_id=cfg.get("model_id"), eval_data_dir=eval_dir,
-            split_note=split_note)
+            use_dora=cfg.get("use_dora", False), split_note=split_note)
     except Exception as e:
         res = {"error": f"{type(e).__name__}: {str(e)[:400]}"}
     finally:
