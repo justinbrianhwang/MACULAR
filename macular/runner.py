@@ -522,12 +522,24 @@ def _exp_ocr_adapt(cfg: dict) -> dict:
     except ImportError:
         return {"experiment": "ocr_adapt", "skipped": True,
                 "reason": 'needs torch + peft: pip install -e ".[model]" peft'}
+    if cfg.get("deterministic"):
+        # Reviewer control: isolate whether same-seed divergence comes from
+        # non-deterministic kernels. Env var must be set before CUDA init.
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+        import torch
+        torch.use_deterministic_algorithms(True, warn_only=True)
     eval_dir = cfg.get("eval_data_dir")
     if eval_dir:
         # Cross-corpus: train on one corpus, evaluate on a different one
         # (synthetic -> real scans, or the reverse). The whole train corpus
         # trains; nothing is halved because the eval documents live elsewhere.
         evald = _load_split({**cfg, "data_dir": eval_dir}, "test")
+        if cfg.get("eval_matched_half"):
+            # Evaluate on the SAME eval half the in-domain runs use, so
+            # transfer and in-domain numbers share one eval set and baseline
+            # (reviewer issue: the original transfer runs evaluated on a
+            # different subset, making magnitudes only loosely comparable).
+            evald = halve_by_language(evald)[1]
         try:
             train = _load_split(cfg, "train")
         except FileNotFoundError:

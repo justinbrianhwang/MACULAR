@@ -1,0 +1,27 @@
+# Cross-corpus transfer: adapt on SYNTHETIC rendered forms, evaluate on REAL
+# XFUND scans. The strongest held-out in the project (different documents,
+# rendering vs scanning, different value distributions), and the experiment
+# that decides whether synthetic-only adaptation is worth anything on paper
+# forms it never saw.
+#
+# Why it matters for the paper: Korean has no public scanned-form corpus, so
+# Korean adaptation can only ever be synthetic. If synthetic->real transfers
+# for ja (the language present in both corpora), that supports synthetic-only
+# Korean adaptation being meaningful; if it does not, the paper must say so.
+# es is a bonus probe: a language absent from the synthetic corpus entirely.
+
+data_dir: data/meddoc_cf_engines     # train: synthetic, family A
+eval_data_dir: data/xfund            # eval: real scans (ja + es)
+device: cuda
+dtype: bfloat16
+
+train_epochs: 2
+max_docs: 60
+eval_max_docs: 50
+max_regions: 24
+lr: 0.0001
+lora_r: 16
+lora_alpha: 32
+seeds: [0, 1, 2]
+eval_matched_half: true  # evaluate on the SAME half as the in-domain runs -> shared baseline, comparable magnitudes
+result_suffix: "_syn2real_matched"
