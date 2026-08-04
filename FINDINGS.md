@@ -621,7 +621,10 @@ Ranking by ja-CER median: rsLoRA r8 (0.069) > LoRA r8 (0.080) > DoRA r16
 model-destroying draw).
 
 **Winner validation on synthetic ko/ja/en (family A→C, 3 seeds).** rsLoRA r8
-improves both metrics for every language in every seed — 9/9 combinations:
+improves both metrics in **8 of 9** language×seed cells — the exception is en
+seed 2, which regresses slightly on both (CER 0.060 vs 0.047, EM 0.893 vs
+0.902). An earlier version of this paragraph claimed 9/9; the adversarial
+review caught the miscount (the paper text has been corrected too):
 
 | Language | baseline CER/EM | after CER | after EM |
 |---|---|---|---|
