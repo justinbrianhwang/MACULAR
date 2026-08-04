@@ -618,8 +618,21 @@ above:
 
 Ranking by ja-CER median: rsLoRA r8 (0.069) > LoRA r8 (0.080) > DoRA r16
 (0.146) > PiSSA r8 (0.215) > VeRA (0.533) ≫ rsLoRA r16 (0.345, with a
-model-destroying draw). Synthetic ko/ja/en validation of the winner is in
-`results/ocr_adapt_rslora_r8.json`.
+model-destroying draw).
+
+**Winner validation on synthetic ko/ja/en (family A→C, 3 seeds).** rsLoRA r8
+improves both metrics for every language in every seed — 9/9 combinations:
+
+| Language | baseline CER/EM | after CER | after EM |
+|---|---|---|---|
+| ko | 0.124 / 0.837 | **0.000** / 0.002 / 0.046 | 0.907–0.997 |
+| ja | 0.099 / 0.830 | 0.003 / 0.017 / 0.079 | 0.843–0.974 |
+| en | 0.047 / 0.902 | 0.003 / 0.008 / 0.060 | 0.893–0.994 |
+
+Korean reaches CER 0.000 on one seed *on held-out PII families*, and every
+cell beats the LoRA-r16 synthetic result. With the XFUND ja/es results this
+makes five language–corpus combinations, all improved on both metrics:
+**rsLoRA r8, 1–2 epochs is the recommended default**, displacing LoRA r8.
 
 ### 4b.6 Second backbone: Qwen2.5-VL-3B (XFUND ja+es, 3 seeds)
 
