@@ -583,8 +583,43 @@ default rank — magnitude/direction decoupling helps. **But it does not stack
 with the rank fix**: DoRA r=8 is worse than LoRA r=8 everywhere and contains a
 bad tail draw (ja 0.448 / EM 0.266). The two remedies are alternative routes to
 the same place, and the simpler one (halve the rank) reaches it with the best
-ja CER of any cell and half the adapter parameters. LoRA r=8 stays the
-recommended default; DoRA r=16 is the verified runner-up.
+ja CER of any cell and half the adapter parameters.
+
+**The wider PEFT-variant sweep (rsLoRA, PiSSA, VeRA; 3 seeds each, same
+protocol).** Each variant tested a specific hypothesis about the failure modes
+above:
+
+| Variant | trainable | ja after CER | ja after EM | es after CER | es after EM |
+|---|---:|---|---|---|---|
+| **rsLoRA r=8** | 14.5M | **0.056 0.069 0.086** | **0.786–0.821** | 0.071 0.083 0.179 | **0.545–0.705** |
+| rsLoRA r=16 | 29.0M | 0.161 0.345 **1.018** | **0.000**–0.704 | 0.286 0.299 **1.697** | **0.000**–0.522 |
+| PiSSA r=8 | 13.8M | 0.134 0.215 0.299 | 0.644–0.774 | 0.306 0.356 0.588 | 0.160–0.367 |
+| VeRA (r=256 scal.) | **1.0M** | 0.532 0.533 0.548 | 0.480–0.490 | 0.433–0.471 | 0.580–0.590 |
+
+- **rsLoRA r=8 is the best cell measured on essentially every metric** — ja CER
+  median 0.069 (vs LoRA r=8's 0.080), es EM above baseline in 3/3 seeds, no
+  diverged draw. New recommended default.
+- **rsLoRA r=16 is the worst cell measured**: one seed destroys the model
+  outright (both languages EM 0.000, es CER *worse than baseline*). rsLoRA
+  raises the effective adapter scale (α/√r > α/r); a moderate boost at r=8
+  helps, the same boost on double the capacity is catastrophic. Scale is a tail
+  *amplifier*, not a stabiliser — and the r8-vs-r16 gap widens under it.
+- **PiSSA r=8 refutes the initialisation hypothesis.** If divergence were a bad
+  init-basin lottery, principled SVD init should shrink the spread. Instead
+  everything is worse than LoRA r=8 (ja median 0.215 vs 0.080), the es EM
+  collapse returns (3/3 below baseline), and the spread stays wide. Consistent
+  with §4b.3's attribution to non-determinism *during* training.
+- **VeRA locates the capacity floor.** Gains are the smallest (ja 0.846 →
+  ~0.54) but the spread is the tightest of any cell ever measured (ja
+  0.532/0.533/0.548) and EM improves over baseline on both languages with 1/14
+  the parameters of LoRA r=8. The capacity–stability trade in its purest form:
+  the "less is more" trend continues below r=8 for stability, but the CER gain
+  falls off a cliff.
+
+Ranking by ja-CER median: rsLoRA r8 (0.069) > LoRA r8 (0.080) > DoRA r16
+(0.146) > PiSSA r8 (0.215) > VeRA (0.533) ≫ rsLoRA r16 (0.345, with a
+model-destroying draw). Synthetic ko/ja/en validation of the winner is in
+`results/ocr_adapt_rslora_r8.json`.
 
 ### 4b.6 Second backbone: Qwen2.5-VL-3B (XFUND ja+es, 3 seeds)
 
