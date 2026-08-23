@@ -727,6 +727,28 @@ enough for scan-trained adapters only when the draw is lucky.
 For the paper: the syn→real direction is the useful one, and it is the
 direction that works. Synthetic-only Korean adaptation is defensible.
 
+**Matched-evaluation re-run (reviewer response, 2026-08-24).** The table
+above evaluates on a different XFUND half than the in-domain runs (so the
+baselines differ: 1.073 vs 0.846). Re-running syn→real with
+`eval_matched_half: true` — the *same* 1,198-region half the in-domain runs
+score on — gives baselines bit-identical to the in-domain ones (ja 0.8457 /
+EM 0.400, es 0.9238 / EM 0.520), so the two settings are now directly
+comparable:
+
+| Language | in-domain after CER (14-run median) | syn→real after CER (3 seeds) | syn→real after EM |
+|---|---|---|---|
+| ja | 0.114 | 0.155 / 0.155 / 0.138 | 0.475 / 0.465 / 0.517 |
+| es | ~0.14–0.40 | **0.567** / 0.148 / 0.137 | 0.623 / 0.608 / 0.633 |
+
+Transfer recovers ~85% of the in-domain ja CER gain (0.846→0.14–0.16 vs
+→0.114) and about a third of the EM gain (0.40→0.47–0.52 vs →~0.78). Spanish,
+still absent from training, lands at in-domain level in 2/3 seeds — and seed 0
+is a **language-selective divergence**: es 0.567 with ja 0.155 and training
+loss 2e-5, indistinguishable from its siblings. That is the 15th trained
+adapter in the pool and the second divergence (after qwen25 seed 1), and it
+repeats the lesson of §4b.3: a per-language gate, not a macro gate, since the
+macro CER 0.452 would still "beat baseline" 0.902.
+
 ### 4b.8 Sizing the eval gate
 
 §4b.3 concluded a post-training eval gate is mandatory. The saved per-region
