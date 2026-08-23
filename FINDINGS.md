@@ -628,14 +628,22 @@ above:
 
 | Variant | trainable | ja after CER | ja after EM | es after CER | es after EM |
 |---|---:|---|---|---|---|
-| **rsLoRA r=8** | 14.5M | **0.056 0.069 0.086** | **0.786–0.821** | 0.071 0.083 0.179 | **0.545–0.705** |
+| **rsLoRA r=8** (3 seeds) | 14.5M | **0.056 0.069 0.086** | **0.786–0.821** | 0.071 0.083 0.179 | **0.545–0.705** |
+| rsLoRA r=8 (7 seeds, pooled) | 14.5M | 0.056–0.214, med 0.093 | 0.570–0.821 | 0.071–0.275, med 0.153 | 0.487–0.705 |
 | rsLoRA r=16 | 29.0M | 0.161 0.345 **1.018** | **0.000**–0.704 | 0.286 0.299 **1.697** | **0.000**–0.522 |
 | PiSSA r=8 | 13.8M | 0.134 0.215 0.299 | 0.644–0.774 | 0.306 0.356 0.588 | 0.160–0.367 |
 | VeRA (r=256 scal.) | **1.0M** | 0.532 0.533 0.548 | 0.480–0.490 | 0.433–0.471 | 0.580–0.590 |
 
-- **rsLoRA r=8 is the best cell measured on essentially every metric** — ja CER
-  median 0.069 (vs LoRA r=8's 0.080), es EM above baseline in 3/3 seeds, no
-  diverged draw. New recommended default.
+- **rsLoRA r=8 is the best cell measured at n=3** — ja CER median 0.069 (vs
+  LoRA r=8's 0.080), es EM above baseline in 3/3 seeds, no diverged draw.
+  **Top-up to 7 seeds (seeds 3–6, reviewer response, 2026-08-24):** ja
+  0.136 / 0.175 / 0.214 / 0.093, es 0.090 / 0.225 / 0.275 / 0.153. No
+  model-destroying draw in 7, but the tail reappears (seed 5: ja 0.214 / EM
+  0.570, es EM 0.487 below baseline) and the pooled median moves to ja 0.093 /
+  es 0.153 — still ahead of the LoRA r16 default pool (ja 0.114 over 14 runs)
+  and still the tightest *real-scan* cell with no divergence, but the 3-seed
+  picture was optimistic, exactly as §4b.3 predicts for any 3-seed read. New
+  recommended default, with the gate.
 - **rsLoRA r=16 is the worst cell measured**: one seed destroys the model
   outright (both languages EM 0.000, es CER *worse than baseline*). rsLoRA
   raises the effective adapter scale (α/√r > α/r); a moderate boost at r=8
@@ -653,7 +661,8 @@ above:
   the "less is more" trend continues below r=8 for stability, but the CER gain
   falls off a cliff.
 
-Ranking by ja-CER median: rsLoRA r8 (0.069) > LoRA r8 (0.080) > DoRA r16
+Ranking by ja-CER median (n=3 for every cell, for comparability; rsLoRA r8
+is 0.093 at n=7): rsLoRA r8 (0.069) > LoRA r8 (0.080) > DoRA r16
 (0.146) > PiSSA r8 (0.215) > VeRA (0.533) ≫ rsLoRA r16 (0.345, with a
 model-destroying draw).
 
