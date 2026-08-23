@@ -1,0 +1,169 @@
+{
+  "experiment": "ocr_adapt_xfund_det",
+  "config": {
+    "model_name": "Qwen/Qwen2-VL-2B-Instruct",
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "use_rslora": false,
+    "use_dora": false,
+    "init_lora_weights": "default",
+    "train_epochs": 2,
+    "lr": 0.0001,
+    "seeds": [
+      0,
+      0,
+      3,
+      4
+    ],
+    "deterministic": true,
+    "eval_matched_half": false
+  },
+  "per_seed": [
+    {
+      "seed": 0,
+      "per_language": {
+        "ja": {
+          "cer_before": 0.4989,
+          "cer_after": 0.0315,
+          "em_before": 0.3846,
+          "em_after": 0.786,
+          "n_regions": 598
+        },
+        "es": {
+          "cer_before": 0.2114,
+          "cer_after": 0.0501,
+          "em_before": 0.5933,
+          "em_after": 0.81,
+          "n_regions": 600
+        }
+      },
+      "loss_history": [
+        0.1631,
+        0.071
+      ]
+    },
+    {
+      "seed": 0,
+      "per_language": {
+        "ja": {
+          "cer_before": 0.4989,
+          "cer_after": 0.0606,
+          "em_before": 0.3846,
+          "em_after": 0.8495,
+          "n_regions": 598
+        },
+        "es": {
+          "cer_before": 0.2114,
+          "cer_after": 0.026,
+          "em_before": 0.5933,
+          "em_after": 0.8483,
+          "n_regions": 600
+        }
+      },
+      "loss_history": [
+        0.1592,
+        0.0764
+      ]
+    },
+    {
+      "seed": 3,
+      "per_language": {
+        "ja": {
+          "cer_before": 0.4989,
+          "cer_after": 0.0217,
+          "em_before": 0.3846,
+          "em_after": 0.8545,
+          "n_regions": 598
+        },
+        "es": {
+          "cer_before": 0.2114,
+          "cer_after": 0.0343,
+          "em_before": 0.5933,
+          "em_after": 0.8133,
+          "n_regions": 600
+        }
+      },
+      "loss_history": [
+        0.1673,
+        0.067
+      ]
+    },
+    {
+      "seed": 4,
+      "per_language": {
+        "ja": {
+          "cer_before": 0.4989,
+          "cer_after": 0.0224,
+          "em_before": 0.3846,
+          "em_after": 0.8378,
+          "n_regions": 598
+        },
+        "es": {
+          "cer_before": 0.2114,
+          "cer_after": 0.0546,
+          "em_before": 0.5933,
+          "em_after": 0.8183,
+          "n_regions": 600
+        }
+      },
+      "loss_history": [
+        0.1579,
+        0.0787
+      ]
+    }
+  ],
+  "aggregate": {
+    "ja": {
+      "cer_before": [
+        0.4989,
+        0.4989,
+        0.4989,
+        0.4989
+      ],
+      "cer_after": [
+        0.0315,
+        0.0606,
+        0.0217,
+        0.0224
+      ],
+      "em_before": [
+        0.3846,
+        0.3846,
+        0.3846,
+        0.3846
+      ],
+      "em_after": [
+        0.786,
+        0.8495,
+        0.8545,
+        0.8378
+      ]
+    },
+    "es": {
+      "cer_before": [
+        0.2114,
+        0.2114,
+        0.2114,
+        0.2114
+      ],
+      "cer_after": [
+        0.0501,
+        0.026,
+        0.0343,
+        0.0546
+      ],
+      "em_before": [
+        0.5933,
+        0.5933,
+        0.5933,
+        0.5933
+      ],
+      "em_after": [
+        0.81,
+        0.8483,
+        0.8133,
+        0.8183
+      ]
+    }
+  }
+}

@@ -1,0 +1,137 @@
+{
+  "experiment": "ocr_adapt_xfund_rslora_r16_lr3e5",
+  "config": {
+    "model_name": "Qwen/Qwen2-VL-2B-Instruct",
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "use_rslora": true,
+    "use_dora": false,
+    "init_lora_weights": "default",
+    "train_epochs": 2,
+    "lr": 3e-05,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "deterministic": false,
+    "eval_matched_half": false
+  },
+  "per_seed": [
+    {
+      "seed": 0,
+      "per_language": {
+        "ja": {
+          "cer_before": 0.4989,
+          "cer_after": 0.0241,
+          "em_before": 0.3846,
+          "em_after": 0.8294,
+          "n_regions": 598
+        },
+        "es": {
+          "cer_before": 0.2114,
+          "cer_after": 0.0308,
+          "em_before": 0.5933,
+          "em_after": 0.8333,
+          "n_regions": 600
+        }
+      },
+      "loss_history": [
+        0.1637,
+        0.0601
+      ]
+    },
+    {
+      "seed": 1,
+      "per_language": {
+        "ja": {
+          "cer_before": 0.4989,
+          "cer_after": 0.0191,
+          "em_before": 0.3846,
+          "em_after": 0.8729,
+          "n_regions": 598
+        },
+        "es": {
+          "cer_before": 0.2114,
+          "cer_after": 0.0209,
+          "em_before": 0.5933,
+          "em_after": 0.8567,
+          "n_regions": 600
+        }
+      },
+      "loss_history": [
+        0.1668,
+        0.0617
+      ]
+    },
+    {
+      "seed": 2,
+      "per_language": {
+        "ja": {
+          "cer_before": 0.4989,
+          "cer_after": 0.0267,
+          "em_before": 0.3846,
+          "em_after": 0.8344,
+          "n_regions": 598
+        },
+        "es": {
+          "cer_before": 0.2114,
+          "cer_after": 0.0457,
+          "em_before": 0.5933,
+          "em_after": 0.835,
+          "n_regions": 600
+        }
+      },
+      "loss_history": [
+        0.1769,
+        0.0614
+      ]
+    }
+  ],
+  "aggregate": {
+    "ja": {
+      "cer_before": [
+        0.4989,
+        0.4989,
+        0.4989
+      ],
+      "cer_after": [
+        0.0241,
+        0.0191,
+        0.0267
+      ],
+      "em_before": [
+        0.3846,
+        0.3846,
+        0.3846
+      ],
+      "em_after": [
+        0.8294,
+        0.8729,
+        0.8344
+      ]
+    },
+    "es": {
+      "cer_before": [
+        0.2114,
+        0.2114,
+        0.2114
+      ],
+      "cer_after": [
+        0.0308,
+        0.0209,
+        0.0457
+      ],
+      "em_before": [
+        0.5933,
+        0.5933,
+        0.5933
+      ],
+      "em_after": [
+        0.8333,
+        0.8567,
+        0.835
+      ]
+    }
+  }
+}

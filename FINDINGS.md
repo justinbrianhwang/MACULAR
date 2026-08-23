@@ -516,6 +516,43 @@ Consequences:
 - Any deployment of this adaptation needs a post-training eval gate, because
   train loss cannot tell a diverged adapter from a good one.
 
+### 4b.3a The determinism control: cause confirmed, failure not removed
+
+Reviewer-requested control: `deterministic: true` (CUBLAS workspace pinned,
+`torch.use_deterministic_algorithms`, memory-efficient/flash SDPA disabled so
+attention uses the math kernel — smoke-tested to zero non-deterministic-op
+warnings). ja+es config, seeds [0, 0, 3, 4].
+
+| seed | ja CER / EM | es CER / EM | loss history |
+|---|---|---|---|
+| 0 | 0.0799 / 0.7876 | 0.1271 / 0.6267 | 0.2269 → 0.0966 |
+| 0 (repeat) | **0.0799 / 0.7876** | **0.1271 / 0.6267** | **identical** |
+| 3 | 0.1809 / **0.2742** | 0.1603 / 0.5167 | 0.2412 → 0.0894 |
+| 4 | 0.0922 / 0.7642 | 0.1205 / 0.5950 | 0.2334 → 0.0798 |
+
+Two conclusions, one expected and one not.
+
+**Cause confirmed.** The seed-0 pair is bit-identical: 1198/1198 predictions
+and the full loss trajectory. Under deterministic kernels an identical seed
+gives an identical adapter, so the 0.099-vs-0.630 divergence of §4b.3 was
+kernel non-determinism and nothing else — not data ordering, not uncontrolled
+RNG state. The hypothesis is promoted to a finding.
+
+**Failure not removed.** Seed 3 lands in a bad basin *reproducibly*: ja EM
+collapses to 0.274 (siblings 0.76–0.79) with a loss history inside the normal
+range. Determinism makes a bad draw repeatable; it does not make it rarer.
+The divergence is a property of the training dynamics (seed-sensitive
+basins); kernel non-determinism only decouples it from the nominal seed. For
+deployment this strengthens the gate recommendation: a deterministic stack
+does not substitute for post-training evaluation.
+
+**Side finding on baselines.** Forcing math attention moved the *base model's*
+zero-shot scores (ja 0.846 → 0.875, es 0.924 → 0.906): junk-prone greedy
+generation is sensitive to which attention kernel runs. Across invocations
+of the same kernel the drift is ~±0.005; across kernels it reaches ~0.03.
+Baselines are therefore comparable only within one kernel configuration —
+all other tables in this file use the default (memory-efficient) kernel.
+
 ### 4b.4 Two measurement faults found and fixed here
 
 **Language-grouped split.** `test.jsonl` is written language-grouped, so the
