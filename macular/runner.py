@@ -528,6 +528,11 @@ def _exp_ocr_adapt(cfg: dict) -> dict:
         os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
         import torch
         torch.use_deterministic_algorithms(True, warn_only=True)
+        # The only op that still warned after this was memory-efficient SDPA
+        # attention; force the (slower, deterministic) math kernel so the
+        # control actually controls something.
+        torch.backends.cuda.enable_mem_efficient_sdp(False)
+        torch.backends.cuda.enable_flash_sdp(False)
     eval_dir = cfg.get("eval_data_dir")
     if eval_dir:
         # Cross-corpus: train on one corpus, evaluate on a different one
