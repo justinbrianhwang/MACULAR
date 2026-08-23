@@ -632,6 +632,7 @@ above:
 | rsLoRA r=8 (7 seeds, pooled) | 14.5M | 0.056–0.214, med 0.093 | 0.570–0.821 | 0.071–0.275, med 0.153 | 0.487–0.705 |
 | rsLoRA r=16 | 29.0M | 0.161 0.345 **1.018** | **0.000**–0.704 | 0.286 0.299 **1.697** | **0.000**–0.522 |
 | PiSSA r=8 | 13.8M | 0.134 0.215 0.299 | 0.644–0.774 | 0.306 0.356 0.588 | 0.160–0.367 |
+| PiSSA r=8, lr 3e-5 | 13.8M | 0.069 0.081 0.086 | **0.818–0.834** | 0.322 0.322 0.493 | 0.637–0.692 |
 | VeRA (r=256 scal.) | **1.0M** | 0.532 0.533 0.548 | 0.480–0.490 | 0.433–0.471 | 0.580–0.590 |
 
 - **rsLoRA r=8 is the best cell measured at n=3** — ja CER median 0.069 (vs
@@ -654,6 +655,15 @@ above:
   everything is worse than LoRA r=8 (ja median 0.215 vs 0.080), the es EM
   collapse returns (3/3 below baseline), and the spread stays wide. Consistent
   with §4b.3's attribution to non-determinism *during* training.
+  **At its authors' learning rate (3e-5, reviewer response, 2026-08-24)
+  PiSSA recovers on Japanese**: ja CER 0.069/0.081/0.086 (median 0.081,
+  level with rsLoRA r8 / LoRA r8) and the *highest ja EM of any cell*
+  (0.818–0.834); es EM goes above baseline in 3/3 (0.637–0.692) but es CER
+  stays poor (0.322–0.493, vs LoRA r8's 0.077–0.154). So the lr-1e-4 PiSSA
+  row above is a learning-rate artefact, not an init result — the
+  "one untuned lr" caveat is real and the sweep is a screening study. The
+  init-basin hypothesis is still not supported: the spread at 3e-5 is as wide
+  on es (0.32–0.49) as any LoRA cell.
 - **VeRA locates the capacity floor.** Gains are the smallest (ja 0.846 →
   ~0.54) but the spread is the tightest of any cell ever measured (ja
   0.532/0.533/0.548) and EM improves over baseline on both languages with 1/14
