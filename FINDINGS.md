@@ -631,6 +631,7 @@ above:
 | **rsLoRA r=8** (3 seeds) | 14.5M | **0.056 0.069 0.086** | **0.786–0.821** | 0.071 0.083 0.179 | **0.545–0.705** |
 | rsLoRA r=8 (7 seeds, pooled) | 14.5M | 0.056–0.214, med 0.093 | 0.570–0.821 | 0.071–0.275, med 0.153 | 0.487–0.705 |
 | rsLoRA r=16 | 29.0M | 0.161 0.345 **1.018** | **0.000**–0.704 | 0.286 0.299 **1.697** | **0.000**–0.522 |
+| rsLoRA r=16, lr 3e-5 | 29.0M | 0.057 0.069 0.078 | 0.784–0.819 | 0.106 0.107 0.132 | 0.642–0.692 |
 | PiSSA r=8 | 13.8M | 0.134 0.215 0.299 | 0.644–0.774 | 0.306 0.356 0.588 | 0.160–0.367 |
 | PiSSA r=8, lr 3e-5 | 13.8M | 0.069 0.081 0.086 | **0.818–0.834** | 0.322 0.322 0.493 | 0.637–0.692 |
 | VeRA (r=256 scal.) | **1.0M** | 0.532 0.533 0.548 | 0.480–0.490 | 0.433–0.471 | 0.580–0.590 |
@@ -650,6 +651,15 @@ above:
   raises the effective adapter scale (α/√r > α/r); a moderate boost at r=8
   helps, the same boost on double the capacity is catastrophic. Scale is a tail
   *amplifier*, not a stabiliser — and the r8-vs-r16 gap widens under it.
+  **At lr 3e-5 (reviewer response, 2026-08-24) rsLoRA r16 fully stabilises**:
+  ja 0.057/0.069/0.078, es 0.106/0.107/0.132, EM ja 0.78–0.82 / es 0.64–0.69 —
+  the best-behaved 3-seed real-scan cell measured (with the usual caveat that
+  3-seed reads are optimistic, per the r8 top-up). So the catastrophe is an
+  *effective-scale × learning-rate product* problem, not rank per se: what the
+  rs-scaling multiplies, the lr can divide back. Also notable: the lr-1e-4
+  seed-0 catastrophe was the only divergence in the project *visible in
+  training loss* (3.67 vs siblings' 0.33) — genuine training collapse, unlike
+  the silent basin divergences of §4b.3.
 - **PiSSA r=8 refutes the initialisation hypothesis.** If divergence were a bad
   init-basin lottery, principled SVD init should shrink the spread. Instead
   everything is worse than LoRA r=8 (ja median 0.215 vs 0.080), the es EM
