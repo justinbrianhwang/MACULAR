@@ -108,7 +108,7 @@ def fig_cascade():
         mean = [sum(v) / len(v) for v in zip(*curves)]
         ax.plot(xs, mean, mk + "-", color=col, label=label)
     ax.set_xlabel("injected OCR CER")
-    ax.set_ylabel("downstream layout F1")
+    ax.set_ylabel("downstream PII F1")
     ax.set_ylim(0.45, 1.0)
     ax.legend(fontsize=8)
     ax.set_title("Flat line = model answers from geometry", fontsize=8)
