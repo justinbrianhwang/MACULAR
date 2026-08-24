@@ -984,3 +984,21 @@ levels reproduce the original single run at 80 epochs. Condition 7 closed.
 - **LoRA r16 / r8 / DoRA r16 at lr 3e-5** (3 seeds each): running on GPU, so
   the rsLoRA-r8 recommendation is compared against every other method at the
   lower rate as well.
+
+**Stronger attacker + selectivity — result** (`results/strong_attack_paddleocr_vl.json`,
+3-seed means; paper's original inverter in parentheses):
+
+| mechanism | inv-XL EM | inv-XL EM ctx | MLP selectivity (task / control) | ctx sel. |
+|---|---|---|---|---|
+| none | 0.163 (0.157) | 0.076 (0.076) | 0.209 (0.982 / 0.773) | 0.290 |
+| hard_mask | 0.029 (0.013) | 0.007 (0.006) | 0.215 (0.967 / 0.753) | 0.163 |
+| gate | 0.033 (0.022) | 0.014 (0.012) | 0.220 (0.977 / 0.757) | 0.234 |
+| leace | 0.137 (0.144) | 0.101 (0.086) | 0.170 (0.942 / 0.772) | 0.204 |
+
+Beam ≈ greedy (±0.005); prior floor 0.000. 2× hidden / 3× epochs / beam-5
+recovers nothing extra from raw features, doubles the small masking residue,
+leaves LEACE unchanged: **ordering unchanged**. Probes have selectivity
+0.17–0.22 everywhere → they read the representation. What remains untested is
+an attacker that re-embeds hypotheses (needs the backbone in the loop). New
+paper §6.3 + Table 7. Condition 1 partially closed (decoder strength), not
+the Vec2Text loop itself.
