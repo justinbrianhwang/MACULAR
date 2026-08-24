@@ -137,8 +137,9 @@ def main():
         print(f"{name:62s} {d:5.3f}  " + "  ".join(f"{a:.3f}/{b:.3f}" for a, b in row))
 
     # --- prospective application of a fixed rule -----------------------------
-    # Rule fixed from the 14-run default pool (ja median 0.114, es 0.299):
-    # per-language 100-region gate, reject if gate CER > 1.5 x pool median.
+    # Rule fixed in advance: per-language 100-region gate; reject if gate CER
+    # exceeds a ceiling of 1.5x the per-language median of the 7-run ja+es
+    # default pool (medians ja 0.114 / es 0.299 -> ceilings 0.171 / 0.449).
     ceil = {"ja": 1.5 * 0.114, "es": 1.5 * 0.299}
     later = [("rsLoRA r8 more", rs), ("PiSSA lr3e-5", load("xfund_pissa_r8_lr3e5")),
              ("rsLoRA r16 lr3e-5", load("xfund_rslora_r16_lr3e5")),
