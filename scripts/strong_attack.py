@@ -55,8 +55,25 @@ def labels_boxes(docs):
     return boxes, pii, clin, mask
 
 
+DEV = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def greedy_dev(net, z, max_len, bos_idx):
+    """net.greedy with the start token on the same device as z."""
+    cur = torch.full((z.shape[0], 1), bos_idx, dtype=torch.long, device=z.device)
+    h = torch.tanh(net.init(z)).unsqueeze(0)
+    outs = []
+    for _ in range(max_len):
+        e = net.emb(cur[:, -1:])
+        step, h = net.rnn(torch.cat([e, z.unsqueeze(1)], dim=-1), h)
+        nxt = net.out(step[:, -1]).argmax(-1, keepdim=True)
+        outs.append(nxt)
+        cur = torch.cat([cur, nxt], dim=1)
+    return torch.cat(outs, dim=1)
+
+
 def beam_decode(net, z, max_len, bos, k=5):
-    """Beam search over the GRU decoder, batch of 1 per region (CPU, small)."""
+    """Beam search over the GRU decoder, batch of 1 per region."""
     outs = []
     for i in range(z.shape[0]):
         zi = z[i:i + 1]
@@ -65,7 +82,7 @@ def beam_decode(net, z, max_len, bos, k=5):
         for _ in range(max_len):
             cand = []
             for score, seq, h in beams:
-                e = net.emb(torch.tensor([[seq[-1]]]))
+                e = net.emb(torch.tensor([[seq[-1]]], device=z.device))
                 step, h2 = net.rnn(torch.cat([e, zi.unsqueeze(1)], dim=-1), h)
                 logp = torch.log_softmax(net.out(step[:, -1]), dim=-1)[0]
                 top = torch.topk(logp, k)
@@ -87,12 +104,13 @@ def invert_xl(x, texts, seed, epochs=1200, hidden=1024, max_len=24, k=5):
     cut = int(n * 0.5)
     tr, te = perm[:cut], perm[cut:]
     mu, sd = x[tr].mean(0), x[tr].std(0).clamp_min(1e-6)
-    xs = (x - mu) / sd
+    xs = ((x - mu) / sd).to(DEV)
+    y = y.to(DEV)
     torch.manual_seed(seed)
     v = len(itos)
-    net = _ARDecoder(x.shape[1], v, hidden=hidden)
+    net = _ARDecoder(x.shape[1], v, hidden=hidden).to(DEV)
     bos = stoi.get(BOS, 1)
-    inp = torch.cat([torch.full((len(tr), 1), bos, dtype=torch.long), y[tr][:, :-1]], dim=1)
+    inp = torch.cat([torch.full((len(tr), 1), bos, dtype=torch.long, device=DEV), y[tr][:, :-1]], dim=1)
     opt = torch.optim.Adam(net.parameters(), lr=1e-3)
     lossf = nn.CrossEntropyLoss()
     for _ in range(epochs):
@@ -102,7 +120,7 @@ def invert_xl(x, texts, seed, epochs=1200, hidden=1024, max_len=24, k=5):
         opt.step()
     net.eval()
     with torch.no_grad():
-        pred_g = net.greedy(xs[te], max_len, bos)
+        pred_g = greedy_dev(net, xs[te], max_len, bos).cpu()
         pred_b = beam_decode(net, xs[te], max_len, bos, k=k)
     res = {}
     for name, pred in (("greedy", pred_g), ("beam5", pred_b)):
