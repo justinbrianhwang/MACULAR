@@ -1012,3 +1012,9 @@ is more" ablation (fewer epochs, lower rank) and the rs-scaling result were
 all moving the same knob — effective update size — and the default lr was
 simply too high for this task. r8 / DoRA at 3e-5 pending before the paper
 paragraph is rewritten.
+
+**LoRA r8 at lr 3e-5 (3 seeds)** — ja 0.102 / 0.113 / 0.116 (EM 0.753–0.761),
+es 0.127 / 0.136 / 0.129 (EM 0.642–0.652). Tight and undiverged like r16 at
+3e-5, but slightly *behind* r16 on ja: once the rate is right, the extra rank
+helps a little instead of hurting — the r8-over-r16 advantage at 1e-4 was
+the rank acting as an update-size brake, not capacity being harmful.
