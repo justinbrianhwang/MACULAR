@@ -1,0 +1,8 @@
+# OCR error cascade on COUNTERFACTUAL layouts, 3 seeds (expected: F1 falls with CER).
+data_dir: data/meddoc_cf
+seeds: [0, 1, 2]
+cer_levels: [0.0, 0.1, 0.2, 0.3, 0.5]
+train_epochs: 40
+lr: 0.003
+train_max_docs: 120
+result_suffix: "_cf"

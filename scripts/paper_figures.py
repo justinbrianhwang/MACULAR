@@ -94,10 +94,19 @@ def fig_gate():
 # --- Fig 3: cascade under shortcut control ---------------------------------
 
 def fig_cascade():
-    # numbers from FINDINGS 1.2 (frozen backbone, controlled OCR corruption)
+    # results/ocr_propagation_{default,cf}_ep80.json: 3 seeds each, per-seed
+    # curves drawn faintly, seed mean bold (FINDINGS 1.2 / 4c.6).
+    import json
     fig, ax = plt.subplots(figsize=(3.6, 2.6))
-    ax.plot([0.0, 0.5], [0.941, 0.941], "s-", label="default layouts")
-    ax.plot([0.0, 0.5], [0.648, 0.530], "o-", label="counterfactual layouts")
+    for name, label, mk, col in (("default_ep80", "default layouts", "s", "C0"),
+                                 ("cf_ep80", "counterfactual layouts", "o", "C1")):
+        d = json.load(open(f"results/ocr_propagation_{name}.json", encoding="utf-8"))
+        xs = [r["cer"] for r in d["per_seed"][0]["curve"]]
+        curves = [[r["val_pii_f1"] for r in s["curve"]] for s in d["per_seed"]]
+        for c in curves:
+            ax.plot(xs, c, "-", color=col, alpha=0.25, lw=1)
+        mean = [sum(v) / len(v) for v in zip(*curves)]
+        ax.plot(xs, mean, mk + "-", color=col, label=label)
     ax.set_xlabel("injected OCR CER")
     ax.set_ylabel("downstream layout F1")
     ax.set_ylim(0.45, 1.0)

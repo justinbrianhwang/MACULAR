@@ -45,6 +45,15 @@ runs land on different operating points. AP/AUC are the reportable metrics here.
 | 0.50 | 0.941 | **0.530** |
 | drop | **0.000 (flat)** | −0.117 |
 
+**3-seed replication (2026-08-24, reviewer response; regenerated corpora
+`data/meddoc_default` / `data/meddoc_cf`, 400 train docs, 80 epochs;
+`configs/cascade_*_ep80.yaml`):** default 0.948/0.949/0.948 → 0.942/0.944/0.944
+(drop ≤0.007, flat in 3/3); counterfactual 0.639/0.645/0.673 →
+0.548/0.570/0.579 (drop 0.075–0.094, declining in 3/3). Level and shape of
+the original single run reproduce. A 40-epoch / 120-doc variant underfits the
+counterfactual task (F1 0.14–0.21) but still shows the flat-vs-declining
+contrast. The paper's Fig. 3 now draws the per-seed curves.
+
 The flat left column is the important part: on default layouts the model answers
 from geometry and never reads the text, so OCR quality cannot matter. Any OCR
 sensitivity claim must be made on counterfactual data.
@@ -149,7 +158,7 @@ Kept deliberately — each was stated confidently and was wrong.
 | "Adaptation makes the model read better, because CER and exact match move together" — then its retraction, "adaptation is format control, not reading" | Both were single-run reads of a heavy-tailed distribution. Over seeds: synthetic improves both metrics in every language; real-scan ja improves EM massively in 6 of 7 runs (the two runs behind the format-control claim were tail draws); real-scan es genuinely does trade EM for CER. Neither slogan was right. §4b.1–4b.2. |
 | "XFUND adaptation cuts CER by 0.98" | The split was language-grouped, so it trained on ja and evaluated on es. A cross-lingual transfer result mislabelled as domain adaptation, with the ja row missing entirely. §4b.4. |
 | "Synthetic English regresses on both metrics under adaptation" | One seed. The 3-seed mean improves English on both metrics (ΔCER −0.029±0.013, ΔEM +0.065±0.009). §4b.1. |
-| "ja's outcome depends on its co-training partner (−0.569 with es vs −0.437 with zh)" | Stated from one run per partner, with the *direction* backwards: at 7 draws per side, es co-training beats zh co-training on the identical ja eval half (EM p = 0.023, CER p = 0.051; §4b.2). The single-run numbers that prompted the claim were both tail draws. |
+| "ja's outcome depends on its co-training partner (−0.569 with es vs −0.437 with zh)" | Stated from one run per partner, with the *direction* backwards: at 7 draws per side, es co-training beats zh co-training on the identical ja eval half (EM p = 0.026, CER p = 0.053; §4b.2). The single-run numbers that prompted the claim were both tail draws. |
 
 ---
 
@@ -479,8 +488,8 @@ What survives across every run:
 **Partner-language effect: real on exact match, borderline on CER (7 vs 7).**
 The ja eval half is identical in both configs, so the co-training language is
 the only difference. Four more ja+zh seeds brought both sides to 7 draws. Exact
-two-sided Mann-Whitney: EM p = 0.023 (median 0.759 beside es vs 0.612 beside
-zh), CER p = 0.051 (median 0.114 vs 0.198) — the CER test just misses because
+two-sided Mann-Whitney: EM p = 0.026 (median 0.759 beside es vs 0.612 beside
+zh), CER p = 0.053 (median 0.114 vs 0.198) — the CER test just misses because
 the es side contains the 0.630 diverged run, which cannot be excluded post hoc.
 Direction is the counterintuitive one: Japanese is helped *more* by Spanish
 co-training than by Chinese. No mechanism is claimed; one mundane candidate is
@@ -836,3 +845,116 @@ ranking on the reconstruction axis, on real scans, with real noise. It cannot
 speak to the erasure-transfer result: FUNSD is one document population with no
 disjoint value families, so §4's transfer failure remains a synthetic-data
 finding. The two must not be blurred in the paper.
+
+## 4c. Second adversarial review round (7-agent, 2026-08-24): what changed
+
+The user-run 7-agent review (`paper/Review/MACULAR_adversarial_review.md`)
+returned REJECT with 12 resubmission conditions. This section records what was
+verified, what was fixed in the text, what was answered with new measurement,
+and what remains open.
+
+### 4c.1 Numerical audit (all four reviewer recalculations checked against data)
+
+| Claim in paper | Reviewer | Recomputed | Verdict |
+|---|---|---|---|
+| Mann–Whitney es-vs-zh co-training, EM p=0.023 / CER p=0.051 | 0.026 / 0.053 | **0.026 / 0.053** (exact, raw values) | reviewer right; fixed |
+| Table 1 "macro" CER before 0.088 | 0.0907 | 0.088 is the length-weighted all-region CER; 0.0907 is the unweighted 3-language mean | label ambiguity; row renamed "all regions (length-weighted)" |
+| Transfer recovers "~85%" of in-domain gain | 94–99% | (0.846−0.155)/(0.846−0.114) = **0.944** | reviewer right; fixed to 94% with the formula printed |
+| Abstract "ja median 0.846→0.114" in the 28-cell (14-adapter) context | pooled median 0.151 | 14-run pooled median = **0.151**; 0.114 is ja+es only | reviewer right; abstract/§4.3 now give both |
+| "gross ΔCER 0.39" provenance | untraceable | r32 es seed 1 (0.558) vs seed 0 (0.165) | now stated in text |
+| Donut cited for SynthDoG | citation error | SynthDoG *was* released in the Donut paper (Kim et al., ECCV 2022) | citation correct; wording now says so |
+
+### 4c.2 Gate: document-level bootstrap, the missing sibling case, prospective rule
+
+`scripts/gate_reviewer_response.py` (doc membership reconstructed by replaying
+the eval-item construction and checking golds against the saved pairs).
+
+Detection rate, region-level / document-level bootstrap:
+
+| case | ΔCER | n=10 | 25 | 50 | 100 | 200 |
+|---|---|---|---|---|---|---|
+| qwen25 s1 vs baseline (subtle) | 0.11 | .851/.837 | .919/.945 | .969/.977 | .997/.995 | 1/1 |
+| r32 es s1 vs s0 (gross) | 0.39 | 1/1 | 1/1 | 1/1 | 1/1 | 1/1 |
+| qwen25 s1 vs sibling s0 | 0.15 | .914/1 | .981/1 | .998/1 | 1/1 | 1/1 |
+| rsLoRA r8 s5 vs s6 | 0.12 | .880/1 | .936/1 | .980/1 | 1/1 | 1/1 |
+| det s3 (bad basin) vs s0 | 0.10 | .954/1 | .990/1 | .999/1 | 1/1 | 1/1 |
+| rsLoRA r8 s3 vs s6 (marginal) | 0.04 | .487/.526 | .540/.561 | .516/.604 | .542/.661 | .617/.728 |
+| syn→real es s0 vs s1 (language-selective) | 0.42 | .430/.430 | .495/.527 | .601/.585 | .755/.703 | .911/.831 |
+
+- Document-level resampling does **not** weaken the gate — sibling cases go
+  to 1.000 at n=10 because a diverged adapter fails whole pages. The
+  i.i.d. objection was worth testing and turned out to point the other way.
+- Beats-baseline-but-loses-to-sibling at Δ 0.10–0.15: separated ≥98% at n=50,
+  100% at n=100. Δ 0.04 is not separable at any n tested: the gate's
+  resolution is ~0.1 CER.
+- **New failure mode**: the language-selective transfer divergence (es 0.567)
+  is caught only 75% at n=100 despite Δ 0.42, because **79% of its excess CER
+  sits in 10 regions** with runaway generation (per-region CER > 1; sibling:
+  19% in top-10). Length-weighted CER is fragile to runaways → recommend
+  clipping per-region CER at 1 *and* gating on EM.
+- **Prospective rule** (fixed before looking: per-language 100-region gate,
+  reject if gate CER > 1.5× the 14-run pool median → ja 0.171 / es 0.449),
+  applied to the 17 adapters trained after §4b.8 was written (34 language
+  cells): 3 rejects (rsLoRA r8 s4 ja 0.175 p=.55, s5 ja 0.214 p=.82, det s3
+  ja 0.181 p=.64), 31 accepts, **32/34 agree with the full-set verdict**. Both
+  misses are es runs over the ceiling on the strength of a few runaway regions
+  (PiSSA-3e-5 s0 0.493, syn→real s0 0.567) — same fragility.
+
+### 4c.3 Adaptation vs model swap vs classical engine (same 1,198 crops)
+
+`scripts/easyocr_xfund_baseline.py` → `results/easyocr_xfund_eval_half.json`.
+
+| system | ja CER | ja EM | es CER | es EM |
+|---|---|---|---|---|
+| EasyOCR (no training) | 0.213 | 0.441 | 0.208 | 0.548 |
+| Qwen2-VL-2B zero-shot | 0.846 | 0.400 | 0.924 | 0.520 |
+| + LoRA r16 (7-run median) | 0.114 | 0.759 | 0.299 | 0.260 |
+| + rsLoRA r8 (7-run median) | 0.093 | 0.779 | 0.153 | 0.658 |
+| Qwen2.5-VL-3B zero-shot | 0.118 | 0.590 | 0.171 | 0.615 |
+| + LoRA r16 (3 seeds) | 0.047–0.226 | 0.597–0.831 | 0.063–0.153 | 0.602–0.740 |
+
+The reviewer's "most destructive" point is conceded in print: the headline
+0.846→0.114 is mostly junk-baseline recovery, and a model swap reaches it
+zero-shot. Adaptation still helps on top of the 3B (2/3 seeds, best cells in
+the table), and EasyOCR's es EM 0.548 beats every adapted-2B es EM — the
+reference the es-EM-degradation finding lacked. New paper §4.8.
+
+### 4c.4 Text-level fixes applied
+
+- Redaction: every universal ("no mechanism defeats a nonlinear attacker")
+  scoped to the attackers run; LEACE value-shift = *partial* protection (removes
+  27% / 67% / 19% of the linear excess on Paddle/Qwen/Ministral), stated with
+  the same-scale-as-hard-mask-residual double standard acknowledged; hard mask
+  explicitly oracle-conditioned and described as an upper bound on a deployed
+  masking pipeline; attacker-strength caveat in the protocol paragraph.
+- Determinism: "repeatable, not rarer" → "repeatable rather than removed"
+  (the rate claim was unsupported: 1/3 distinct seeds deterministic vs 1/14).
+- Medical framing and the non-joint nature of §4/§6 stated in the intro's
+  second paragraph; generator spec (2 doc types, Noto CJK, rotation+noise) and
+  the no-realism-check caveat in §3.
+- Related work: Dodge 2020, Mosbach 2021, He 2025 (nondeterminism), LayoutLMv3
+  / UDOP (task non-comparability stated), DP-SGD (different quantity, not
+  compared). 34 references.
+- Implementation details: LoRA targets, dropout, schedule, step size, region
+  counts; relation graph = 2-layer Transformer encoder (d=128, 4 heads); repo URL.
+- Discussion: PEFT recommendation qualified by the 7-seed tail and the two lr
+  controls; full-FT control absent stated.
+
+### 4c.5 Cascade re-run with seeds
+
+See §1.2: 3/3 seeds flat on default, 3/3 declining on counterfactual, absolute
+levels reproduce the original single run at 80 epochs. Condition 7 closed.
+
+### 4c.6 Still open (need new experiments or are out of reach)
+
+| condition | status |
+|---|---|
+| Vec2Text-style iterative inverter | not run (est. 1–2 GPU-days incl. training an inverter per backbone) |
+| PII detector composed with hard mask (end-to-end leakage) | not run (detector exists; ~half a day) |
+| Per-method lr sweep for all PEFT variants | two controls run (PiSSA, rsLoRA r16); full sweep ~2 GPU-days |
+| PaddleOCR-VL as a *recognizer* on the same crops | not run (~hours; env conflict with torch noted in baselines/ocr.py) |
+| Full fine-tuning control for the 2B | not run |
+| XFUND template near-duplicate audit | not run (cheap; image-hash pass) |
+| Probe selectivity / control task | not run |
+| Family-shift artefact control | not run |
+| Real Korean scanned medical corpus | does not exist; stated as field gap |

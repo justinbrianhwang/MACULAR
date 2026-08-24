@@ -254,16 +254,27 @@ def _exp_ocr_propagation(cfg: dict) -> dict:
     train = _load_split(cfg, "train")
     val = _load_split(cfg, "val")
     levels = cfg.get("cer_levels", [0.0, 0.1, 0.2, 0.3, 0.5])
-    rows = ocr_error_propagation(
-        train, val, cer_levels=levels, epochs=cfg.get("train_epochs", 40),
-        lr=cfg.get("lr", 3e-3), max_docs=cfg.get("train_max_docs", 120))
-    clean = rows[0]["val_pii_f1"] if rows else None
-    worst = rows[-1]["val_pii_f1"] if rows else None
+    # Reviewer response: the cascade was a single-seed experiment. `seeds`
+    # runs the whole curve per seed so the drop is reported as a distribution.
+    seeds = cfg.get("seeds") or [cfg.get("seed", 0)]
+    per_seed = []
+    for sd in seeds:
+        rows = ocr_error_propagation(
+            train, val, cer_levels=levels, epochs=cfg.get("train_epochs", 40),
+            lr=cfg.get("lr", 3e-3), seed=sd,
+            max_docs=cfg.get("train_max_docs", 120))
+        clean = rows[0]["val_pii_f1"] if rows else None
+        worst = rows[-1]["val_pii_f1"] if rows else None
+        per_seed.append({"seed": sd, "curve": rows,
+                         "f1_drop_clean_to_worst": (clean - worst) if clean is not None else None})
+    rows = per_seed[0]["curve"]
     return {
         "experiment": "ocr_propagation",
         "n_train_docs": min(len(train), cfg.get("train_max_docs", 120)),
+        "seeds": seeds,
+        "per_seed": per_seed,
         "curve": rows,
-        "f1_drop_clean_to_worst": (clean - worst) if (clean is not None) else None,
+        "f1_drop_clean_to_worst": per_seed[0]["f1_drop_clean_to_worst"],
         "note": ("Downstream PII F1 vs simulated OCR CER. Demonstrates the "
                  "error cascade that motivates MACULAR (proposal section 2)."),
     }

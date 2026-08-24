@@ -1,0 +1,7 @@
+# Reviewer response: regenerate the counterfactual-layout corpus for the multi-seed cascade.
+seed: 0
+data_dir: data/meddoc_cf
+n_per_split: 500
+languages: [en, ko, ja]
+counterfactual_layout: true
+render_images: false

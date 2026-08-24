@@ -1,0 +1,7 @@
+# Reviewer response: regenerate the default-layout corpus for the multi-seed cascade.
+seed: 0
+data_dir: data/meddoc_default
+n_per_split: 500
+languages: [en, ko, ja]
+counterfactual_layout: false
+render_images: false
