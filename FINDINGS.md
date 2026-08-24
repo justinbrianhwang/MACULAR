@@ -1018,3 +1018,15 @@ es 0.127 / 0.136 / 0.129 (EM 0.642–0.652). Tight and undiverged like r16 at
 3e-5, but slightly *behind* r16 on ja: once the rate is right, the extra rank
 helps a little instead of hurting — the r8-over-r16 advantage at 1e-4 was
 the rank acting as an update-size brake, not capacity being harmful.
+
+**DoRA r16 at lr 3e-5 (3 seeds)** — ja 0.084 / 0.099 / 0.101 (EM 0.774–0.801),
+es 0.104 / 0.125 / **0.328** (EM 0.662–0.708). ja matches LoRA r16 at 3e-5;
+es has one moderate tail draw (0.328, EM still above baseline). The lr-matched
+sweep at 3e-5 now covers LoRA r16/r8, DoRA r16, PiSSA r8, rsLoRA r16 —
+**ja medians: rsLoRA r16 0.069 < PiSSA 0.081 < LoRA r16 0.096 ≈ DoRA 0.099 <
+LoRA r8 0.113** — every method's es EM is above baseline, and no
+model-destroying divergence appeared in any of the fifteen 3e-5 runs. At the
+matched lower rate the differences between PEFT methods shrink to ~0.04 CER,
+versus the 10× spread the shared 1e-4 produced. The 1e-4 variant ranking was
+mostly a learning-rate artefact; the update-size story (§4b.5) survives, the
+method ranking does not.
