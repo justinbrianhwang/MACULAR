@@ -1,0 +1,13 @@
+# Reviewer control (round 2): full fine-tuning of the language tower (vision
+# frozen), no adapter. lr 1e-5 (LoRA's 1e-4 is far too high for full updates).
+data_dir: data/xfund
+device: cuda
+dtype: bfloat16
+train_epochs: 2
+max_docs: 50
+eval_max_docs: 50
+max_regions: 24
+lr: 0.00001
+full_finetune: true
+seeds: [0, 1, 2]
+result_suffix: "_xfund_fullft"

@@ -594,7 +594,8 @@ def _exp_ocr_adapt(cfg: dict) -> dict:
             use_dora=cfg.get("use_dora", False),
             use_rslora=cfg.get("use_rslora", False),
             init_lora_weights=cfg.get("init_lora_weights", True),
-            use_vera=cfg.get("use_vera", False), split_note=split_note)
+            use_vera=cfg.get("use_vera", False), split_note=split_note,
+            full_finetune=cfg.get("full_finetune", False))
     except Exception as e:
         res = {"error": f"{type(e).__name__}: {str(e)[:400]}"}
     finally:

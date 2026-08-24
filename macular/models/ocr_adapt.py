@@ -186,12 +186,22 @@ _WER_NOTE = " WER is null for ko/ja/zh: whitespace word error is meaningless."
 
 def _train_one_seed(proc, model, train_items, eval_items, seed, epochs, lr,
                     lora_r, lora_alpha, pairs_out=None, use_dora=False,
-                    use_rslora=False, init_lora_weights=True, use_vera=False):
+                    use_rslora=False, init_lora_weights=True, use_vera=False,
+                    full_finetune=False):
     """Attach a fresh adapter, train it, and evaluate. Mutates ``model``."""
     from peft import LoraConfig, get_peft_model
 
     torch.manual_seed(seed)
     base_dtype = next(model.parameters()).dtype
+    if full_finetune:
+        # Reviewer control: no adapter, update the whole language tower (the
+        # vision tower stays frozen so AdamW states fit beside the 2B weights
+        # on 32 GB). Same data, prompt, epochs and clipping as the LoRA runs.
+        for n, p in model.named_parameters():
+            p.requires_grad = "visual" not in n
+        model.gradient_checkpointing_enable()
+        return _train_loop(proc, model, train_items, eval_items, seed, epochs,
+                           lr, pairs_out)
     # "proj" also names the vision patch-embed Conv3d. Plain LoRA/DoRA wrap
     # conv layers fine; PiSSA init and VeRA support only nn.Linear, so they
     # get the linear-only target list.
@@ -217,6 +227,12 @@ def _train_one_seed(proc, model, train_items, eval_items, seed, epochs, lr,
     # weight type BFloat16Type"). Casting to the base dtype is harmless for
     # plain LoRA, so do it unconditionally.
     model = model.to(base_dtype)
+    return _train_loop(proc, model, train_items, eval_items, seed, epochs, lr,
+                       pairs_out)
+
+
+def _train_loop(proc, model, train_items, eval_items, seed, epochs, lr,
+                pairs_out):
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     opt = torch.optim.AdamW(
@@ -254,7 +270,7 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
                          dtype="bfloat16", seed=0, seeds=None, model_id=None,
                          eval_data_dir=None, use_dora=False, use_rslora=False,
                          init_lora_weights=True, use_vera=False,
-                         split_note=FAMILY_SPLIT_NOTE):
+                         split_note=FAMILY_SPLIT_NOTE, full_finetune=False):
     """Baseline CER -> LoRA adaptation -> adapted CER, paired, over N seeds.
 
     Seeds are not optional decoration here. On XFUND, ja appears in two runs on
@@ -294,7 +310,7 @@ def finetune_and_measure(train_docs, eval_docs, data_dir, epochs=2,
             proc, model, train_items, eval_items, s, epochs, lr, lora_r,
             lora_alpha, pairs_out=after_pairs, use_dora=use_dora,
             use_rslora=use_rslora, init_lora_weights=init_lora_weights,
-            use_vera=use_vera)
+            use_vera=use_vera, full_finetune=full_finetune)
         per_seed.append({
             "seed": s, "loss_history": history, "cer_after": after,
             "eval_pairs": after_pairs,
