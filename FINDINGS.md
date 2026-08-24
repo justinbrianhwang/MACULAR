@@ -1041,3 +1041,57 @@ es 0.387 vs 0.104–0.136) and es EM is *below* baseline. One untuned lr
 (1e-5), so this is a control, not a tuned comparison — but PEFT beating
 full FT at 26–58× fewer trainable parameters closes reviewer condition
 "full-FT control absent". GPU queue complete.
+
+## 4d. Round-2 revision review (BORDERLINE): mandatory fixes + small experiments
+
+The 7-agent re-review returned BORDERLINE (Reject 0; was 5) with 5 mandatory
+text corrections (N1–N5) and small-experiment recommendations. Actions:
+
+- **N1** Abstract gate claim rewritten: no more bare "≥99.7%" — now states
+  ≥99.5% region- and document-level for every ΔCER ≥ 0.10 case, names the
+  0.04-margin and runaway-es failures, and cites the 32/34 prospective result.
+- **N2** §7 "no protection under value shift" → "partial protection
+  (19–67% of linear excess removed)" — now consistent with §6.4.
+- **N3** Gate rule wording fixed: 0.171/0.449 are *ceilings* = 1.5× the
+  per-language medians (0.114/0.299) of the **7-run ja+es** pool (not
+  "14-run pool medians"). Script comment fixed too.
+- **N4** §4.8 EasyOCR scope fixed: es EM 0.548 beats every
+  *default-configuration* 2B run (≤0.538); rsLoRA r8 (0.658) and the 3e-5
+  cells surpass it.
+- **N5** Table 6 inv. CER column regenerated from the Zenodo archive
+  (3-seed means of ctx_inversion_cer): paddle 0.433/1.163/0.755/0.544,
+  qwen 0.556/1.039/0.814/0.913, ministral 0.476/1.024/0.597/0.630. The old
+  column carried values from the pre-rerun run1 file; probes/AP/F1 columns
+  were already archive-consistent, and claim (4)'s above-prior EMs verify
+  exactly. Aggregation ("mean over 3 seeds") now stated in the caption; the
+  Qwen det.AP = clinical-F1 = 0.899 equality is a verified coincidence
+  (AP per seed 0.909/0.869/0.919).
+- **N6** hard mask description corrected: not a "learned constant" — a
+  detached probability-weighted *type embedding* (type retained by design,
+  value dropped). Claim (3) "share one constant vector" reworded.
+- **N7** Abstract floor claim scoped: floor reached on 1 backbone, within
+  0.012–0.032 on the other two.
+- **N8** `requirements-lock.txt` added (transformers 5.14.1, peft 0.20.0,
+  torch 2.11.0+cu128, easyocr 1.7.2 …); paper env sentence now points at it.
+
+**Recommendation 6+7 executed** (`scripts/detector_probe_metrics.py`,
+paddle cache, 3 seeds, held-out family B):
+
+| mechanism | det P@0.5 | det R@0.5 | ctx MLP balanced acc | (raw acc) |
+|---|---|---|---|---|
+| none | 0.74–0.76 | 0.980–0.983 | 0.861–0.865 | 0.973–0.975 |
+| hard_mask | 0.815–0.823 | 0.977–0.978 | **0.164–0.196** | 0.837–0.849 |
+| gate | 0.784–0.789 | 0.977–0.983 | 0.593–0.743 | 0.924–0.946 |
+| leace | 0.738–0.751 | 0.980–0.981 | 0.532–0.585 | 0.912–0.924 |
+
+Two upgrades: (a) the detector runs **recall-biased** at the deployed
+threshold (<3% of sensitive regions escape the mask, on the held-out
+family — the paper's own value-shift condition); (b) balanced accuracy
+shows the hard mask collapses per-type discrimination to near chance
+(0.125), which raw accuracy against the 0.847 majority had compressed.
+Both now in §6.1/§6.2.
+
+**Not done, flagged to the user**: PaddleOCR-VL as recognizer (blocked on
+transformers 5.14, documented), §4+§6 coupling experiment (adapted-backbone
+features through the attack protocol — feasible, ~half a day GPU), real
+medical arm / title decision (CHIP2022 MedOCR), Vec2Text-loop attacker.
