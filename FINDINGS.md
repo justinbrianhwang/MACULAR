@@ -1002,3 +1002,13 @@ leaves LEACE unchanged: **ordering unchanged**. Probes have selectivity
 an attacker that re-embeds hypotheses (needs the backbone in the loop). New
 paper §6.3 + Table 7. Condition 1 partially closed (decoder strength), not
 the Vec2Text loop itself.
+
+**LoRA r16 at lr 3e-5 (3 seeds)** — ja 0.087 / 0.096 / 0.102 (EM 0.751–0.759),
+es 0.112 / 0.135 / 0.120 (EM 0.633–0.662, *above* baseline 0.520 in 3/3).
+Against the 1e-4 default (ja 0.099–0.147 + 0.630; es 0.132–0.399 with EM
+below baseline in 6/7): the lower rate alone tightens ja, fixes the es
+exact-match collapse and produced no divergence in three draws. The "less
+is more" ablation (fewer epochs, lower rank) and the rs-scaling result were
+all moving the same knob — effective update size — and the default lr was
+simply too high for this task. r8 / DoRA at 3e-5 pending before the paper
+paragraph is rewritten.
