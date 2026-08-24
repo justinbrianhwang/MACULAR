@@ -1030,3 +1030,14 @@ matched lower rate the differences between PEFT methods shrink to ~0.04 CER,
 versus the 10× spread the shared 1e-4 produced. The 1e-4 variant ranking was
 mostly a learning-rate artefact; the update-size story (§4b.5) survives, the
 method ranking does not.
+
+**Full fine-tuning control (language tower 1.54B params, vision frozen,
+lr 1e-5, 3 "seeds")** — ja 0.127 / EM 0.656, es 0.387 / EM 0.362, identical
+across all three seeds: full FT has no seed-dependent randomness in this
+pipeline (no adapter init, no dropout in the base model), so within one
+process the three runs are bit-identical — effectively a single run.
+Worse than every 3e-5 LoRA cell on both languages (ja 0.127 vs 0.084–0.116;
+es 0.387 vs 0.104–0.136) and es EM is *below* baseline. One untuned lr
+(1e-5), so this is a control, not a tuned comparison — but PEFT beating
+full FT at 26–58× fewer trainable parameters closes reviewer condition
+"full-FT control absent". GPU queue complete.
