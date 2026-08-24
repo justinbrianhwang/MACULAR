@@ -133,7 +133,7 @@ def fig_tradeoff():
               "leace": "tab:green"}
     markers = {"PaddleOCR-VL": "o", "Qwen2-VL-2B": "s", "Ministral-3": "^"}
 
-    fig, ax = plt.subplots(figsize=(4.2, 3.0))
+    fig, ax = plt.subplots(figsize=(4.2, 3.3))
     for bb, mechs in data.items():
         for m, (leak, util) in mechs.items():
             ax.scatter(leak, util, c=colors[m], marker=markers[bb], s=45,
@@ -146,14 +146,16 @@ def fig_tradeoff():
             for m, c in colors.items()]
     leg2 = [Line2D([], [], marker=mk, ls="", color="black", label=bb)
             for bb, mk in markers.items()]
-    first = ax.legend(handles=leg1, loc="lower right", fontsize=7,
-                      title="mechanism", title_fontsize=7)
-    ax.add_artist(first)
-    ax.legend(handles=leg2, loc="upper left", fontsize=7, title="backbone",
-              title_fontsize=7)
+    # Both legends BELOW the axes so no data point is covered.
+    fig.legend(handles=leg1, loc="lower center", bbox_to_anchor=(0.54, 0.105),
+               ncol=4, frameon=False, fontsize=7, columnspacing=0.8,
+               handletextpad=0.3)
+    fig.legend(handles=leg2, loc="lower center", bbox_to_anchor=(0.54, 0.015),
+               ncol=3, frameon=False, fontsize=7, columnspacing=0.8,
+               handletextpad=0.3)
     ax.set_xlabel("post-graph nonlinear probe accuracy (leakage) $\\to$ worse")
     ax.set_ylabel("clinical macro-F1 (utility)")
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0.20, 1, 1))
     fig.savefig(os.path.join(OUT, "fig_tradeoff.pdf"))
     plt.close(fig)
 
