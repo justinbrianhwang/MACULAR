@@ -958,3 +958,29 @@ levels reproduce the original single run at 80 epochs. Condition 7 closed.
 | Probe selectivity / control task | not run |
 | Family-shift artefact control | not run |
 | Real Korean scanned medical corpus | does not exist; stated as field gap |
+
+### 4c.7 Round-2 experiments (2026-08-24, running list)
+
+- **XFUND template near-duplicate audit** (`scripts/xfund_template_audit.py`,
+  16×16 dHash, <24/256 bits = same template): ja+es **1 cross-half pair**
+  (es_val_16 / es_val_5, 17 bits) out of 1,250 same-language cross pairs,
+  ja+zh **0**; median cross-half distance 112 bits; 0 within-half pairs.
+  Template leakage across the self-split is negligible. Condition 9 closed.
+- **Hard mask is NOT an oracle** — correction of our own paper text. `core.py`
+  `redaction="hard"` thresholds the model's *own* PII head at 0.5 (detached),
+  so every hard_mask row already composes a learned detector (val AP:
+  Paddle 0.982, Qwen 0.923, Ministral 0.989, FUNSD 0.888). The paper's threat
+  model, intro, abstract, conclusion and limitations now say so, and Table 6
+  gained a det.-AP column. Reviewer condition 5 ("oracle synthesis") is
+  answered by the existing measurement; what remains unmeasured is an
+  *external* tagger composed with the mask.
+- **PaddleOCR-VL as recognizer**: blocked — its remote generation code targets
+  transformers 4.x and fails on 5.14 (ROPE_INIT_FUNCTIONS); documented in
+  `ocr_adapt.py`. Not run.
+- **Stronger attacker + probe selectivity** (`scripts/strong_attack.py`,
+  PaddleOCR-VL cached features, CPU): GRU inverter with h=1024 / 1200 epochs /
+  beam-5, and a Hewitt–Liang control task (random label per unique text) for
+  the linear and MLP probes. Running.
+- **LoRA r16 / r8 / DoRA r16 at lr 3e-5** (3 seeds each): running on GPU, so
+  the rsLoRA-r8 recommendation is compared against every other method at the
+  lower rate as well.

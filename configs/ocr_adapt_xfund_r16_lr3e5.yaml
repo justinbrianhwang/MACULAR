@@ -1,0 +1,14 @@
+# Reviewer response (round 2): per-method lr control for plain LoRA, so the
+# rsLoRA-r8 recommendation is compared against LoRA at the lower rate too.
+data_dir: data/xfund
+device: cuda
+dtype: bfloat16
+train_epochs: 2
+max_docs: 50
+eval_max_docs: 50
+max_regions: 24
+lr: 0.00003
+lora_r: 16
+lora_alpha: 32
+seeds: [0, 1, 2]
+result_suffix: "_xfund_r16_lr3e5"
