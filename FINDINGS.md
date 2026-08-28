@@ -1088,7 +1088,7 @@ Two upgrades: (a) the detector runs **recall-biased** at the deployed
 threshold (<3% of sensitive regions escape the mask, on the held-out
 family — the paper's own value-shift condition); (b) balanced accuracy
 shows the hard mask collapses per-type discrimination to near chance
-(0.125), which raw accuracy against the 0.847 majority had compressed.
+(1/9 = 0.111), which raw accuracy against the 0.847 majority had compressed.
 Both now in §6.1/§6.2.
 
 **Not done, flagged to the user**: PaddleOCR-VL as recognizer (blocked on
